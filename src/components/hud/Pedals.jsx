@@ -24,15 +24,14 @@ function Pedal({ id, label, ko, from, to }) {
   const applyFromPointer = (e) => {
     if (!pressed.current) return;
     const r = e.currentTarget.getBoundingClientRect();
-    // Top 15% of pedal gives 100% full throttle/brake so thumb doesn't have to reach the very edge
     const raw = 1 - (e.clientY - r.top) / Math.max(1, r.height);
     setter(c01(raw * 1.12));
   };
 
   return (
-    <div className="flex flex-1 h-full max-w-[96px] select-none flex-col items-center justify-center gap-0.5">
+    <div className="flex flex-1 h-full max-w-[92px] select-none flex-col items-center justify-center gap-0.5">
       <div
-        className="relative w-full flex-1 min-h-[72px] max-h-[126px] cursor-pointer touch-none overflow-hidden rounded-xl sm:rounded-2xl border border-white/15 bg-black/50 shadow-inner"
+        className="relative w-full flex-1 min-h-[70px] max-h-[126px] cursor-pointer touch-none overflow-hidden rounded-xl sm:rounded-2xl border border-white/15 bg-black/50 shadow-inner"
         onPointerDown={(e) => {
           e.preventDefault();
           audioEngine.ensure();
@@ -57,7 +56,6 @@ function Pedal({ id, label, ko, from, to }) {
         role="slider"
         aria-label={`${label} pedal`}
       >
-        {/* Metallic pedal grip grooves */}
         {[20, 40, 60, 80].map((t) => (
           <div
             key={t}
@@ -65,11 +63,9 @@ function Pedal({ id, label, ko, from, to }) {
             style={{ bottom: `${t}%` }}
           />
         ))}
-        {/* tick marks */}
         {[0, 25, 50, 75, 100].map((t) => (
           <div key={t} className="absolute left-1.5 h-px w-2 bg-white/20" style={{ bottom: `${t}%` }} />
         ))}
-        {/* fill */}
         <div
           ref={fillRef}
           className="pointer-events-none absolute bottom-0 left-0 right-0"
@@ -79,7 +75,7 @@ function Pedal({ id, label, ko, from, to }) {
             boxShadow: `0 0 18px -2px ${from}`,
           }}
         />
-        <div className="pointer-events-none absolute inset-x-0 top-1.5 text-center text-[7px] sm:text-[8px] font-bold tracking-[0.18em] text-slate-300">
+        <div className="pointer-events-none absolute inset-x-0 top-1.5 text-center text-[7px] sm:text-[8px] font-bold tracking-[0.16em] text-slate-300">
           {label}
         </div>
         <div className="pointer-events-none absolute inset-x-0 bottom-1.5 flex items-baseline justify-center gap-0.5">
@@ -94,19 +90,45 @@ function Pedal({ id, label, ko, from, to }) {
   );
 }
 
-/** Interactive multi-touch accelerator & brake pedals (pointer, touch, keyboard). */
+/** Interactive multi-touch Brake, Throttle & N₂O Nitrous Purge/Shot controls. */
 export default function Pedals() {
+  const nosActive = useEngineStore((s) => s.nosActive);
+  const setNosActive = useEngineStore((s) => s.setNosActive);
+  const setThrottle = useEngineStore((s) => s.setThrottle);
+
   return (
-    <div className="flex h-full w-full flex-col items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2">
-      <div className="text-[7px] sm:text-[9px] tracking-[0.22em] text-slate-500">
-        PEDALS · HOLD BOTH = LAUNCH
+    <div className="flex h-full w-full flex-col items-center justify-between px-2 py-1.5 sm:px-3 sm:py-2">
+      <div className="flex w-full items-center justify-between">
+        <span className="text-[7px] sm:text-[8px] tracking-[0.18em] text-slate-500">
+          PEDALS · HOLD BOTH = LAUNCH
+        </span>
+        {/* N₂O Nitrous Oxide Hold Button */}
+        <button
+          onPointerDown={(e) => {
+            e.preventDefault();
+            audioEngine.ensure();
+            setNosActive(true);
+            if (useEngineStore.getState().throttle < 0.5) setThrottle(1);
+          }}
+          onPointerUp={() => setNosActive(false)}
+          onPointerLeave={() => setNosActive(false)}
+          onPointerCancel={() => setNosActive(false)}
+          className={`rounded-md border px-2 py-0.5 font-mono text-[8px] sm:text-[9px] font-extrabold tracking-wider transition-all ${
+            nosActive
+              ? 'border-cyan-300 bg-cyan-400/30 text-white shadow-[0_0_16px_rgba(56,189,248,0.85)] scale-95'
+              : 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20'
+          }`}
+        >
+          ⚡ N₂O SHOT
+        </button>
       </div>
+
       <div className="flex w-full flex-1 min-h-0 items-stretch justify-center gap-2 sm:gap-3 py-0.5">
         <Pedal id="brake" label="BRAKE" ko="브레이크" from="#f87171" to="#7f1d1d" />
         <Pedal id="accel" label="THROTTLE" ko="가속" from="#34d399" to="#0e7490" />
       </div>
       <div className="hidden lg:block text-[7px] tracking-wider text-slate-600">
-        DRAG VERTICAL · ↑/W GAS · ↓/S BRAKE
+        DRAG PEDALS · ↑/W GAS · ↓/S BRAKE · SHIFT N₂O
       </div>
     </div>
   );

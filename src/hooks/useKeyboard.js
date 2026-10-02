@@ -5,15 +5,17 @@ import { audioEngine } from '../audio/AudioEngine.js';
 
 /**
  * Keyboard controls:
- *   ↑ / W    throttle
- *   ↓ / S    brake
- *   ← / →    shift down / up (in D)
- *   R / N / D gear mode
- *   A        toggle Auto-Shift DCT
- *   E        cycle ECU mode (Comfort / Sport / Track+)
- *   X        toggle X-Ray cutaway view
- *   M        mute / unmute audio
- *   Space    engine start / stop
+ *   ↑ / W      throttle
+ *   ↓ / S      brake
+ *   ← / →      shift down / up (in D)
+ *   R / N / D  gear mode
+ *   A          toggle Auto-Shift DCT
+ *   E          cycle ECU mode (Comfort / Sport / Track+)
+ *   G          open/close Garage & Tuning Workshop
+ *   ShiftLeft  hold for N₂O Nitrous Shot
+ *   X          toggle X-Ray cutaway view
+ *   M          mute / unmute audio
+ *   Space      engine start / stop
  */
 export function useKeyboard() {
   useEffect(() => {
@@ -56,6 +58,16 @@ export function useKeyboard() {
         case 'KeyE':
           if (!e.repeat) st().cycleEcuMode();
           break;
+        case 'KeyG':
+          if (!e.repeat) st().toggleTuningOpen();
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          if (!e.repeat) {
+            audioEngine.ensure();
+            st().setNosActive(true);
+          }
+          break;
         case 'KeyX':
           if (!e.repeat) st().toggleXray();
           break;
@@ -66,6 +78,9 @@ export function useKeyboard() {
           e.preventDefault();
           if (!e.repeat) togglePower();
           break;
+        case 'Escape':
+          if (st().tuningOpen) st().setTuningOpen(false);
+          break;
         default:
           return;
       }
@@ -74,12 +89,14 @@ export function useKeyboard() {
     const up = (e) => {
       if (e.code === 'ArrowUp' || e.code === 'KeyW') st().setThrottle(0);
       if (e.code === 'ArrowDown' || e.code === 'KeyS') st().setBrake(0);
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') st().setNosActive(false);
     };
 
     const blur = () => {
       const s = st();
       s.setThrottle(0);
       s.setBrake(0);
+      s.setNosActive(false);
     };
 
     window.addEventListener('keydown', down);

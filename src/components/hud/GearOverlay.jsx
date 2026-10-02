@@ -1,15 +1,18 @@
 import { useLiveNode } from '../../hooks/useLiveNode.js';
+import { useEngineStore } from '../../store/engineStore.js';
+import { ENGINES } from '../../sim/constants.js';
 import { visualAngle } from '../scene/engineGeometry.js';
-
-const FIRING_ORDER = [1, 2, 4, 5, 3];
 
 /**
  * Bottom-left & bottom-right 3D viewport HUD overlay:
  * - Big translucent gear indicator
- * - Live 5-cylinder firing pulse visualizer (1-2-4-5-3)
+ * - Live Cylinder Firing Order Sequencer (adapts to 4, 5, 6, or 8 cylinders!)
  * - Live EGT (°C) & Oil temperature pill
  */
 export default function GearOverlay() {
+  const engineType = useEngineStore((s) => s.engineType);
+  const spec = ENGINES[engineType] || ENGINES.I5_29;
+
   const gearRef = useLiveNode((el, s) => {
     el.textContent = s.gearMode === 'D' ? String(s.gearPos) : s.gearMode;
     el.style.opacity = s.running ? 0.92 : 0.3;
@@ -31,14 +34,14 @@ export default function GearOverlay() {
   });
   const cylDotsRef = useLiveNode((el, s) => {
     const children = el.children;
-    if (!children || children.length < 5) return;
+    const n = children ? children.length : 0;
+    if (!n) return;
     const on = s.running && s.rpm > 120;
-    // Highlight active firing cylinder along the 1-2-4-5-3 sequence
-    const idx = Math.floor(((visualAngle.value / (Math.PI * 2)) * 5) % 5);
-    for (let i = 0; i < 5; i++) {
+    const idx = Math.floor(((visualAngle.value / (Math.PI * 2)) * n) % n);
+    for (let i = 0; i < n; i++) {
       const active = on && i === idx;
-      children[i].style.background = active ? '#fb923c' : 'rgba(255,255,255,0.12)';
-      children[i].style.boxShadow = active ? '0 0 8px #f97316' : 'none';
+      children[i].style.background = active ? (s.nosActive ? '#38bdf8' : '#fb923c') : 'rgba(255,255,255,0.12)';
+      children[i].style.boxShadow = active ? `0 0 8px ${s.nosActive ? '#38bdf8' : '#f97316'}` : 'none';
       children[i].style.color = active ? '#04060a' : '#94a3b8';
     }
   });
@@ -73,15 +76,15 @@ export default function GearOverlay() {
         </div>
       </div>
 
-      {/* Firing Order 1-2-4-5-3 live pulse strip (bottom-right of 3D view) */}
+      {/* Live Firing Order Sequencer (adapts to I4 / I5 / I6 / V8) */}
       <div className="pointer-events-none absolute bottom-2.5 right-3 sm:bottom-4 sm:right-5 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 backdrop-blur-md">
-        <span className="text-[7px] sm:text-[8px] font-semibold tracking-[0.18em] text-slate-400">
+        <span className="text-[7px] sm:text-[8px] font-semibold tracking-[0.16em] text-slate-400">
           FIRING
         </span>
         <div ref={cylDotsRef} className="flex items-center gap-1">
-          {FIRING_ORDER.map((cyl) => (
+          {spec.firingOrder.map((cyl, i) => (
             <span
-              key={cyl}
+              key={`${cyl}-${i}`}
               className="flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full font-mono text-[8px] sm:text-[9px] font-bold transition-colors duration-75"
             >
               {cyl}

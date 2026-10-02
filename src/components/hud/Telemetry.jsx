@@ -20,12 +20,12 @@ export default function Telemetry() {
   const ratio = gearMode === 'D' ? GEAR_RATIOS[gearPos - 1] : gearMode === 'R' ? REVERSE_RATIO : 0;
 
   const powerRef = useLiveNode((el, s) => {
-    const hp = s.rpm > 25 ? enginePowerHP(s.rpm, s.throttle, s.boost) : 0;
+    const hp = s.rpm > 25 ? enginePowerHP(s.rpm, s.throttle, s.boost, s) : 0;
     el.textContent = `${Math.round(hp)} HP`;
   });
 
   const torqueRef = useLiveNode((el, s) => {
-    const t = s.rpm > 25 ? engineTorque(s.rpm, s.throttle, s.boost) : 0;
+    const t = s.rpm > 25 ? engineTorque(s.rpm, s.throttle, s.boost, s) : 0;
     el.textContent = `${Math.round(t)} Nm`;
   });
 
@@ -41,7 +41,7 @@ export default function Telemetry() {
       el.style.color = '#fb923c';
       return;
     }
-    const spin = Math.abs(s.speed) < 35 && s.throttle > 0.65 && s.rpm > 3400 && s.gearMode === 'D' && s.gearPos === 1;
+    const spin = s.wheelspin || (Math.abs(s.speed) < 30 && s.throttle > 0.65 && s.rpm > 3400 && s.gearMode === 'D' && s.gearPos === 1);
     el.textContent = spin ? 'WHEELSPIN' : 'GRIP';
     el.style.color = spin ? '#fbbf24' : '#34d399';
   });

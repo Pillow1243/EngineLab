@@ -1,12 +1,13 @@
+import { useEngineStore } from '../../store/engineStore.js';
 import { useLiveAttribute, useLiveNode } from '../../hooks/useLiveNode.js';
-import { REDLINE } from '../../sim/constants.js';
+import { resolveSpecs } from '../../sim/simulation.js';
 
 const CX = 110;
 const CY = 116;
 const R = 88;
 const A0 = 135;
 const A1 = 405; // 270° sweep
-const MAX = 9000;
+const MAX = 10000; // 0..10 ×1000 rpm to support Forged I4 9600 RPM redline!
 
 const polar = (r, deg) => {
   const a = (deg * Math.PI) / 180;
@@ -22,31 +23,35 @@ const arc = (r, a0, a1) => {
 
 const angleOf = (rpm) => A0 + (Math.min(rpm, MAX) / MAX) * (A1 - A0);
 
-const SHIFT_THRESHOLDS = [3200, 4200, 5000, 5700, 6300, 6750, 7100, 7500];
-
-/** Circular analog tachometer, 0–9 ×1000 rpm with F1-style shift lights & 7000 rpm redline. */
+/** Circular analog tachometer, 0–10 ×1000 rpm with dynamic engine redline & F1 shift lights. */
 export default function Tachometer() {
-  // needle — direct attribute write, 60fps, zero re-renders
+  const engineType = useEngineStore((s) => s.engineType);
+  const internalsUpgrade = useEngineStore((s) => s.internalsUpgrade);
+  const { redline } = resolveSpecs({ engineType, internalsUpgrade });
+
   const needleRef = useLiveAttribute(
     (s) => s.rpm,
     'transform',
     (rpm) => `rotate(${(angleOf(rpm) + 90).toFixed(2)} ${CX} ${CY})`,
   );
-  // redline zone flicker above 7000
   const redRef = useLiveNode((el, s) => {
-    el.style.opacity = s.rpm > REDLINE ? 0.55 + 0.45 * Math.sin(s.rpm * 0.05) : 0.9;
+    const rl = resolveSpecs(s).redline;
+    el.style.opacity = s.rpm > rl ? 0.55 + 0.45 * Math.sin(s.rpm * 0.05) : 0.9;
   });
   const rpmTextRef = useLiveNode((el, s) => {
+    const rl = resolveSpecs(s).redline;
     el.textContent = String(Math.max(0, Math.round(s.rpm)));
-    el.style.color = s.rpm > REDLINE ? '#f87171' : '#e2e8f0';
+    el.style.color = s.rpm > rl ? '#f87171' : '#e2e8f0';
   });
-  // F1-style 8-LED shift light bar
+  // F1-style 8-LED shift light bar scaled to active redline
   const shiftBarRef = useLiveNode((el, s) => {
     const leds = el.children;
     if (!leds) return;
-    const flash = s.rpm > 7250 && Math.sin(performance.now() * 0.04) > 0;
+    const rl = resolveSpecs(s).redline;
+    const flash = s.rpm > rl + 200 && Math.sin(performance.now() * 0.045) > 0;
     for (let i = 0; i < leds.length; i++) {
-      const on = s.rpm >= SHIFT_THRESHOLDS[i];
+      const thresh = rl * (0.48 + (i / (leds.length - 1)) * 0.56);
+      const on = s.rpm >= thresh;
       const color = i < 3 ? '#34d399' : i < 6 ? '#fbbf24' : '#ef4444';
       leds[i].style.background = on ? (flash ? '#ffffff' : color) : 'rgba(255,255,255,0.08)';
       leds[i].style.boxShadow = on ? `0 0 8px ${color}` : 'none';
@@ -54,8 +59,8 @@ export default function Tachometer() {
   });
 
   const ticks = [];
-  for (let k = 0; k <= 18; k++) {
-    const deg = A0 + k * 15;
+  for (let k = 0; k <= 20; k++) {
+    const deg = A0 + k * 13.5;
     const major = k % 2 === 0;
     const [x0, y0] = polar(R, deg);
     const [x1, y1] = polar(R - (major ? 11 : 6), deg);
@@ -67,7 +72,7 @@ export default function Tachometer() {
         x2={x1}
         y2={y1}
         stroke={major ? '#94a3b8' : '#475569'}
-        strokeWidth={major ? 2.5 : 1.2}
+        strokeWidth={major ? 2.4 : 1.2}
         strokeLinecap="round"
       />,
     );
@@ -77,27 +82,26 @@ export default function Tachometer() {
     <div className="flex h-full w-full flex-col items-center justify-between py-1.5 px-1.5 sm:py-2 sm:px-2">
       {/* Shift light LED array */}
       <div ref={shiftBarRef} className="flex w-full max-w-[150px] items-center justify-center gap-1 pt-0.5">
-        {SHIFT_THRESHOLDS.map((t) => (
-          <span key={t} className="h-1.5 flex-1 rounded-full bg-white/10" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <span key={i} className="h-1.5 flex-1 rounded-full bg-white/10" />
         ))}
       </div>
 
       <svg viewBox="0 0 220 205" className="min-h-0 flex-1 w-full max-w-[198px]">
-        {/* track */}
         <path d={arc(R, A0, A1)} fill="none" stroke="#1f2937" strokeWidth={6} strokeLinecap="round" />
-        {/* redline zone 7000–9000 */}
+        {/* dynamic redline zone */}
         <path
           ref={redRef}
-          d={arc(R, angleOf(REDLINE), A1)}
+          d={arc(R, angleOf(redline), A1)}
           fill="none"
           stroke="#ef4444"
           strokeWidth={6}
           strokeLinecap="round"
         />
         {ticks}
-        {/* labels */}
-        {Array.from({ length: 10 }).map((_, k) => {
-          const [x, y] = polar(R - 23, A0 + k * 30);
+        {Array.from({ length: 11 }).map((_, k) => {
+          const [x, y] = polar(R - 23, A0 + k * 27);
+          const isRed = k * 1000 >= redline;
           return (
             <text
               key={k}
@@ -105,8 +109,8 @@ export default function Tachometer() {
               y={y}
               textAnchor="middle"
               dominantBaseline="central"
-              fill={k >= 7 ? '#f87171' : '#cbd5e1'}
-              fontSize="13"
+              fill={isRed ? '#f87171' : '#cbd5e1'}
+              fontSize="12"
               fontWeight="700"
               fontFamily="ui-monospace, monospace"
             >
@@ -118,7 +122,6 @@ export default function Tachometer() {
           RPM ×1000
         </text>
 
-        {/* needle */}
         <g ref={needleRef} style={{ filter: 'drop-shadow(0 0 4px rgba(248,113,113,0.55))' }}>
           <line x1={CX} y1={CY + 15} x2={CX} y2={CY - R + 10} stroke="#f87171" strokeWidth={3} strokeLinecap="round" />
         </g>
@@ -136,7 +139,7 @@ export default function Tachometer() {
         <span className="text-[8px] sm:text-[10px] tracking-[0.18em] text-slate-500">RPM</span>
       </div>
       <div className="hidden sm:block text-[7px] lg:text-[8px] tracking-[0.26em] text-slate-600">
-        TACHOMETER · 타코미터
+        REDLINE {redline} · 타코미터
       </div>
     </div>
   );

@@ -1,11 +1,13 @@
+import { useEngineStore } from '../../store/engineStore.js';
 import { useLiveAttribute, useLiveNode, useLiveStylePart, useLiveText } from '../../hooks/useLiveNode.js';
+import { ASPIRATIONS } from '../../sim/constants.js';
 
 const CX = 75;
 const CY = 78;
 const R = 58;
 const A0 = 135;
 const A1 = 405;
-const MAX = 1.55;
+const MAX = 2.0; // Supports Twin-Turbo up to 2.0+ bar!
 
 const polar = (r, deg) => {
   const a = (deg * Math.PI) / 180;
@@ -19,21 +21,27 @@ const arc = (r, a0, a1) => {
 };
 const angleOf = (b) => A0 + (Math.min(b, MAX) / MAX) * (A1 - A0);
 
-/** Turbo boost dial + spool bar (responsive for both mobile portrait and desktop). */
+/** Forced-Induction Boost / Spool Gauge (adapts to NA, Single Turbo, Bi-Turbo, Supercharger). */
 export default function BoostGauge() {
+  const aspiration = useEngineStore((s) => s.aspiration);
+  const asp = ASPIRATIONS[aspiration] || ASPIRATIONS.SINGLE_TURBO;
+
   const needleRef = useLiveAttribute(
-    (s) => s.boost,
+    (s) => (s.aspiration === 'NA' ? s.throttle * 1.0 : s.boost),
     'transform',
     (b) => `rotate(${(angleOf(b) + 90).toFixed(2)} ${CX} ${CY})`,
   );
-  const barRef = useLiveText((s) => s.boost, (b) => b.toFixed(2));
+  const barRef = useLiveText(
+    (s) => (s.aspiration === 'NA' ? s.throttle * 100 : s.boost),
+    (v) => (aspiration === 'NA' ? `${Math.round(v)}%` : v.toFixed(2)),
+  );
   const spoolRef = useLiveStylePart(
-    (s) => s.spool,
+    (s) => (s.aspiration === 'NA' ? s.throttle : s.spool),
     (sp) => ({ width: `${Math.min(100, (sp / 1.2) * 100).toFixed(1)}%` }),
   );
   const ledRef = useLiveNode((el, s) => {
     const flash = s.bovFlash > 0;
-    const glow = 0.25 + 0.75 * Math.min(1, s.boost / 1.2);
+    const glow = 0.25 + 0.75 * Math.min(1, s.boost / 1.4);
     el.style.background = flash ? '#f8fafc' : s.boost > 0.12 ? '#22d3ee' : '#334155';
     el.style.boxShadow = flash
       ? '0 0 12px 3px rgba(248,250,252,0.85)'
@@ -42,16 +50,21 @@ export default function BoostGauge() {
         : 'none';
   });
   const bovLabelRef = useLiveNode((el, s) => {
-    el.textContent = s.bovFlash > 0 ? 'BOV VENT!' : 'TURBO · 터보';
-    el.style.color = s.bovFlash > 0 ? '#f8fafc' : '#94a3b8';
+    if (s.bovFlash > 0) {
+      el.textContent = s.aspiration === 'TWIN_TURBO' ? '2x BOV + FLUTTER!' : 'BOV VENT!';
+      el.style.color = '#f8fafc';
+    } else {
+      el.textContent = asp.short;
+      el.style.color = '#94a3b8';
+    }
   });
 
   return (
     <div className="flex h-full w-full flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2.5 px-2 py-1.5 sm:px-3.5 sm:py-2">
-      <svg viewBox="0 0 150 142" className="min-h-0 w-[76px] sm:w-[96px] lg:w-[114px] shrink-0">
+      <svg viewBox="0 0 150 142" className="min-h-0 w-[74px] sm:w-[96px] lg:w-[114px] shrink-0">
         <path d={arc(R, A0, A1)} fill="none" stroke="#1f2937" strokeWidth={5} strokeLinecap="round" />
-        <path d={arc(R, angleOf(1.2), A1)} fill="none" stroke="#ef4444" strokeWidth={5} strokeLinecap="round" opacity={0.85} />
-        {[0, 0.5, 1.0, 1.5].map((v) => {
+        <path d={arc(R, angleOf(1.45), A1)} fill="none" stroke="#ef4444" strokeWidth={5} strokeLinecap="round" opacity={0.85} />
+        {[0, 0.5, 1.0, 1.5, 2.0].map((v) => {
           const [x0, y0] = polar(R, angleOf(v));
           const [x1, y1] = polar(R - 8, angleOf(v));
           const [tx, ty] = polar(R - 18, angleOf(v));
@@ -64,7 +77,7 @@ export default function BoostGauge() {
                 textAnchor="middle"
                 dominantBaseline="central"
                 fill="#94a3b8"
-                fontSize="9"
+                fontSize="8.5"
                 fontFamily="ui-monospace, monospace"
               >
                 {v.toFixed(1)}
@@ -77,24 +90,26 @@ export default function BoostGauge() {
         </g>
         <circle cx={CX} cy={CY} r={5} fill="#0b1220" stroke="#475569" strokeWidth={1.2} />
         <text x={CX} y={CY - 24} textAnchor="middle" fill="#64748b" fontSize="7" letterSpacing="1.5">
-          bar
+          {aspiration === 'NA' ? 'ITB' : 'bar'}
         </text>
       </svg>
 
       <div className="flex w-full min-w-0 flex-1 flex-col items-center sm:items-stretch justify-center gap-0.5 sm:gap-1">
-        <div className="hidden sm:block text-[8px] lg:text-[9px] tracking-[0.22em] text-slate-500">
-          TURBO BOOST
+        <div className="hidden sm:block text-[8px] lg:text-[9px] tracking-[0.2em] text-slate-500">
+          {aspiration === 'NA' ? 'ITB THROTTLE' : 'BOOST PRESSURE'}
         </div>
         <div className="flex items-baseline gap-1">
           <span ref={barRef} className="font-mono text-base sm:text-xl lg:text-2xl font-bold tabular-nums text-cyan-300">
             0.00
           </span>
-          <span className="text-[8px] sm:text-[9px] text-slate-500">bar</span>
+          <span className="text-[8px] sm:text-[9px] text-slate-500">
+            {aspiration === 'NA' ? 'OPEN' : 'bar'}
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <span ref={ledRef} className="h-2 w-2 shrink-0 rounded-full bg-slate-700" />
-          <span ref={bovLabelRef} className="truncate text-[8px] sm:text-[9px] tracking-[0.16em] text-slate-400">
-            TURBO · 터보
+          <span ref={bovLabelRef} className="truncate text-[8px] sm:text-[9px] tracking-[0.12em] text-slate-400">
+            {asp.short}
           </span>
         </div>
         <div className="w-full mt-0.5 sm:mt-auto">

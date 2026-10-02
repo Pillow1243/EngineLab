@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import {
-  SHIFT_LOCK_TIME,
   GEAR_RATIOS,
   FINAL_DRIVE,
   WHEEL_RADIUS,
-  LIMIT_RPM,
+  UPGRADES,
 } from '../sim/constants.js';
+import { resolveSpecs } from '../sim/simulation.js';
 
 const c01 = (v) => Math.min(1, Math.max(0, v));
 
@@ -33,6 +33,7 @@ export const useEngineStore = create((set, get) => ({
   bovFlash: 0,
   backfireFlash: 0,
   launchActive: false,
+  wheelspin: false,
   limiterHit: false,
   egt: 320, // °C
   oilTemp: 82, // °C
@@ -55,6 +56,17 @@ export const useEngineStore = create((set, get) => ({
   audioOn: false,
   muted: false,
 
+  /* ---------- Engine Garage & Tuning Workshop state ---------- */
+  engineType: 'I5_29', // 'I4_20' | 'I5_29' | 'I6_30' | 'V8_40'
+  aspiration: 'SINGLE_TURBO', // 'NA' | 'SINGLE_TURBO' | 'TWIN_TURBO' | 'SUPERCHARGER'
+  internalsUpgrade: 'STOCK', // 'STOCK' | 'FORGED'
+  exhaustUpgrade: 'SPORT', // 'STOCK' | 'SPORT' | 'TITANIUM'
+  transUpgrade: 'STREET', // 'STREET' | 'RACE_DOG'
+  tireUpgrade: 'STREET', // 'STREET' | 'SEMI_SLICK' | 'DRAG_SLICK'
+  nosInstalled: true,
+  nosActive: false,
+  tuningOpen: false,
+
   /* ---------- actions ---------- */
   start() {
     if (get().running) return;
@@ -63,33 +75,50 @@ export const useEngineStore = create((set, get) => ({
   },
   stop() {
     vibrate(20);
-    set({ running: false, cranking: false, throttle: 0, brake: 0, launchActive: false });
+    set({
+      running: false,
+      cranking: false,
+      throttle: 0,
+      brake: 0,
+      launchActive: false,
+      nosActive: false,
+    });
   },
   togglePower() {
     get().running ? get().stop() : get().start();
   },
   setGearMode(m) {
-    if (get().gearMode === m) return;
+    const s = get();
+    if (s.gearMode === m) return;
     vibrate(15);
-    set({ gearMode: m, gearPos: 1, shiftLock: SHIFT_LOCK_TIME * 0.7 });
+    const shiftT = (UPGRADES.transmission[s.transUpgrade] || UPGRADES.transmission.STREET).shiftTime;
+    const lock = Math.abs(s.speed) > 2 ? shiftT * 0.7 : 0.08;
+    set({
+      gearMode: m,
+      gearPos: 1,
+      shiftLock: lock,
+      _pendingEvent: { type: 'shift', dir: 'mode' },
+    });
   },
   selectGear(i) {
     const s = get();
     if (s.gearMode === 'D' && i === s.gearPos) return;
     vibrate(12);
-    const isDown = s.gearMode === 'D' && i < s.gearPos && Math.abs(s.speed) > 8;
+    const { limitRpm, trans } = resolveSpecs(s);
+    const moving = Math.abs(s.speed) > 5 && s.running;
+    const isDown = s.gearMode === 'D' && i < s.gearPos && moving;
     let nextRpm = s.rpm;
-    if (isDown && s.running) {
+    if (isDown) {
       const nextRatio = GEAR_RATIOS[i - 1];
       const targetRpm =
         (Math.abs(s.speed) / 3.6 / WHEEL_RADIUS) * (60 / (2 * Math.PI)) * (nextRatio * FINAL_DRIVE);
-      nextRpm = Math.min(LIMIT_RPM - 250, Math.max(s.rpm, targetRpm * 0.92));
+      nextRpm = Math.min(limitRpm - 220, Math.max(s.rpm, targetRpm * 0.94));
     }
     set({
       gearMode: 'D',
       gearPos: i,
       rpm: nextRpm,
-      shiftLock: SHIFT_LOCK_TIME,
+      shiftLock: moving ? trans.shiftTime : 0.08,
       _pendingEvent: isDown ? { type: 'downshiftBlip' } : { type: 'shift', dir: 'up' },
     });
   },
@@ -97,9 +126,11 @@ export const useEngineStore = create((set, get) => ({
     const s = get();
     if (s.gearMode === 'D' && s.gearPos < 7) {
       vibrate(14);
+      const { trans } = resolveSpecs(s);
+      const moving = Math.abs(s.speed) > 5 && s.running;
       set({
         gearPos: s.gearPos + 1,
-        shiftLock: SHIFT_LOCK_TIME,
+        shiftLock: moving ? trans.shiftTime : 0.08,
         _pendingEvent: { type: 'shift', dir: 'up' },
       });
     }
@@ -108,21 +139,22 @@ export const useEngineStore = create((set, get) => ({
     const s = get();
     if (s.gearMode === 'D' && s.gearPos > 1) {
       vibrate([12, 20, 12]);
+      const { limitRpm, trans } = resolveSpecs(s);
       const nextGear = s.gearPos - 1;
       let nextRpm = s.rpm;
-      const moving = Math.abs(s.speed) > 8 && s.running;
+      const moving = Math.abs(s.speed) > 6 && s.running;
       if (moving) {
         const nextRatio = GEAR_RATIOS[nextGear - 1];
         const targetRpm =
           (Math.abs(s.speed) / 3.6 / WHEEL_RADIUS) *
           (60 / (2 * Math.PI)) *
           (nextRatio * FINAL_DRIVE);
-        nextRpm = Math.min(LIMIT_RPM - 250, Math.max(s.rpm, targetRpm * 0.94));
+        nextRpm = Math.min(limitRpm - 220, Math.max(s.rpm, targetRpm * 0.95));
       }
       set({
         gearPos: nextGear,
         rpm: nextRpm,
-        shiftLock: SHIFT_LOCK_TIME * 0.85,
+        shiftLock: moving ? trans.shiftTime * 0.85 : 0.08,
         _pendingEvent: moving ? { type: 'downshiftBlip' } : { type: 'shift', dir: 'down' },
       });
     }
@@ -132,6 +164,9 @@ export const useEngineStore = create((set, get) => ({
   },
   setBrake(v) {
     set({ brake: c01(v) });
+  },
+  setNosActive(v) {
+    set({ nosActive: !!v });
   },
   setView(v) {
     set({ view: v });
@@ -157,5 +192,36 @@ export const useEngineStore = create((set, get) => ({
   },
   toggleMute() {
     set((s) => ({ muted: !s.muted }));
+  },
+  setEngineType(engineType) {
+    vibrate([15, 30]);
+    set({ engineType, zeroToHundred: null });
+  },
+  setAspiration(aspiration) {
+    vibrate(15);
+    set({ aspiration, boost: 0, spool: 0, zeroToHundred: null });
+  },
+  setInternalsUpgrade(internalsUpgrade) {
+    vibrate(12);
+    set({ internalsUpgrade, zeroToHundred: null });
+  },
+  setExhaustUpgrade(exhaustUpgrade) {
+    vibrate(12);
+    set({ exhaustUpgrade });
+  },
+  setTransUpgrade(transUpgrade) {
+    vibrate(12);
+    set({ transUpgrade });
+  },
+  setTireUpgrade(tireUpgrade) {
+    vibrate(12);
+    set({ tireUpgrade, zeroToHundred: null });
+  },
+  toggleTuningOpen() {
+    vibrate(10);
+    set((s) => ({ tuningOpen: !s.tuningOpen }));
+  },
+  setTuningOpen(v) {
+    set({ tuningOpen: !!v });
   },
 }));
