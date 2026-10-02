@@ -1,8 +1,10 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
-import { MAT } from './materials.js';
+import { useEngineStore } from '../../store/engineStore.js';
+import { engineTorque } from '../../sim/simulation.js';
+import { MAT, applyXrayMaterialState } from './materials.js';
 import { XS, visualAngle } from './engineGeometry.js';
 import CrankTrain from './CrankTrain.jsx';
 import Turbocharger from './Turbocharger.jsx';
@@ -30,9 +32,20 @@ function Flywheel() {
 }
 
 /**
- * The full Inline-5 Turbo assembly (static body + moving sub-assemblies).
+ * The full Inline-5 Turbo assembly:
+ * - Mounted on a dynamic torque-roll & vibration rig
+ * - Supports live X-Ray cutaway mode
+ * - Includes RS Red-Top Ignition Coils, High-Pressure Fuel Rail, Oil Filter & Alternator
  */
 export default function EngineModel() {
+  const mountRef = useRef();
+  const xray = useEngineStore((s) => s.xray);
+  const roll = useRef(0);
+
+  useEffect(() => {
+    applyXrayMaterialState(xray);
+  }, [xray]);
+
   /* intake runners: plenum → each head port */
   const intakeTubes = useMemo(
     () =>
@@ -63,8 +76,30 @@ export default function EngineModel() {
     [],
   );
 
+  // Dynamic engine mount torque roll & 5-cylinder firing vibration
+  useFrame((state, dt) => {
+    if (!mountRef.current) return;
+    const s = useEngineStore.getState();
+    const tq = s.rpm > 25 ? engineTorque(s.rpm, s.throttle, s.boost) : 0;
+    const shiftJolt = s.shiftLock > 0.22 ? -0.032 : 0;
+    const targetRoll = (tq / 680) * 0.065 + shiftJolt;
+    roll.current += (targetRoll - roll.current) * Math.min(1, dt * 12);
+
+    // Subtle 2.5-order harmonic vibration on rubber mounts
+    const t = state.clock.elapsedTime;
+    const vibAmp = s.cranking
+      ? 0.008
+      : s.running
+        ? 0.0018 + 0.0022 * Math.max(0, 1 - s.rpm / 2400) + 0.0015 * s.throttle
+        : 0;
+    const vibFreq = Math.max(14, (s.rpm / 60) * Math.PI * 5);
+
+    mountRef.current.rotation.x = roll.current + Math.sin(t * vibFreq) * vibAmp * 1.6;
+    mountRef.current.position.y = Math.cos(t * vibFreq * 1.1) * vibAmp;
+  });
+
   return (
-    <group>
+    <group ref={mountRef}>
       {/* ---- sump / oil pan ---- */}
       <RoundedBox
         args={[1.4, 0.16, 0.4]}
@@ -99,6 +134,26 @@ export default function EngineModel() {
         </mesh>
       ))}
 
+      {/* ---- Oil Filter Canister & Cooler on front-right block ---- */}
+      <group position={[-0.48, 0.36, 0.26]} rotation-x={0.35}>
+        <mesh material={MAT.blockDark} castShadow>
+          <cylinderGeometry args={[0.058, 0.058, 0.14, 20]} />
+        </mesh>
+        <mesh material={MAT.alu} position={[0, -0.075, 0]}>
+          <cylinderGeometry args={[0.062, 0.062, 0.025, 20]} />
+        </mesh>
+      </group>
+
+      {/* ---- Alternator mounted on lower intake side ---- */}
+      <group position={[-0.62, 0.32, 0.28]}>
+        <mesh material={MAT.alu} rotation-z={Math.PI / 2} castShadow>
+          <cylinderGeometry args={[0.085, 0.085, 0.13, 20]} />
+        </mesh>
+        <mesh material={MAT.steelDark} rotation-z={Math.PI / 2} position={[-0.08, 0, 0]}>
+          <cylinderGeometry args={[0.038, 0.038, 0.035, 16]} />
+        </mesh>
+      </group>
+
       {/* ---- head + valve cover ---- */}
       <RoundedBox
         args={[1.55, 0.1, 0.4]}
@@ -121,9 +176,43 @@ export default function EngineModel() {
           <boxGeometry args={[0.05, 0.02, 0.26]} />
         </mesh>
       ))}
+
+      {/* ---- 5 RS Red-Top Ignition Coil Packs + Wiring Conduit ---- */}
       {XS.map((x, i) => (
-        <mesh key={i} material={MAT.steel} position={[x, 1.08, 0]}>
-          <cylinderGeometry args={[0.035, 0.04, 0.03, 16]} />
+        <group key={i} position={[x, 1.08, -0.01]}>
+          <mesh material={MAT.steel}>
+            <cylinderGeometry args={[0.032, 0.038, 0.03, 16]} />
+          </mesh>
+          <RoundedBox
+            args={[0.068, 0.026, 0.075]}
+            radius={0.006}
+            smoothness={2}
+            position={[0, 0.022, 0]}
+            material={MAT.coilRed}
+          />
+        </group>
+      ))}
+      {/* Ignition harness rail */}
+      <mesh material={MAT.rubber} position={[0, 1.095, -0.075]}>
+        <boxGeometry args={[1.36, 0.018, 0.024]} />
+      </mesh>
+      {/* Oil filler cap */}
+      <group position={[-0.68, 1.08, 0.07]}>
+        <mesh material={MAT.alu}>
+          <cylinderGeometry args={[0.042, 0.042, 0.025, 18]} />
+        </mesh>
+        <mesh material={MAT.coilRed} position={[0, 0.015, 0]}>
+          <boxGeometry args={[0.065, 0.01, 0.02]} />
+        </mesh>
+      </group>
+
+      {/* ---- High-Pressure Fuel Rail + 5 Brass Injectors ---- */}
+      <mesh material={MAT.alu} rotation-z={Math.PI / 2} position={[0, 0.96, 0.15]}>
+        <cylinderGeometry args={[0.016, 0.016, 1.38, 14]} />
+      </mesh>
+      {XS.map((x, i) => (
+        <mesh key={i} material={MAT.brass} position={[x, 0.92, 0.13]} rotation-x={-0.45}>
+          <cylinderGeometry args={[0.01, 0.01, 0.07, 10]} />
         </mesh>
       ))}
 
@@ -156,7 +245,7 @@ export default function EngineModel() {
       <Turbocharger />
       <TimingBelt />
 
-      {/* ---- rear: clutch cover, flywheel, gearbox ---- */}
+      {/* ---- rear: clutch cover, flywheel, 7-DCT gearbox ---- */}
       <mesh material={MAT.steelDark} rotation-z={Math.PI / 2} position={[0.79, 0.34, 0]} castShadow>
         <cylinderGeometry args={[0.26, 0.22, 0.07, 28]} />
       </mesh>
@@ -169,6 +258,12 @@ export default function EngineModel() {
         material={MAT.blockDark}
         castShadow
       />
+      {/* Gearbox cooling ribs */}
+      {[-0.12, -0.04, 0.04, 0.12].map((z, i) => (
+        <mesh key={i} material={MAT.steelDark} position={[1.15, 0.57, z]}>
+          <boxGeometry args={[0.46, 0.015, 0.02]} />
+        </mesh>
+      ))}
       <RoundedBox
         args={[0.3, 0.1, 0.14]}
         radius={0.03}

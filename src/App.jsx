@@ -12,16 +12,16 @@ export default function App() {
 
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden bg-[#04060a] text-slate-200"
+      className="app-shell flex h-dvh w-full flex-col overflow-hidden bg-[#04060a] text-slate-200"
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* ---------- top half: 3D engine viewport ---------- */}
-      <div className="relative min-h-0 flex-1">
+      {/* ---------- 3D engine viewport ---------- */}
+      <div className="viewport-pane relative min-h-[210px] flex-1">
         <EngineScene />
         <TopOverlay />
         <ViewButtons />
         <GearOverlay />
-        {/* subtle vignette */}
+        {/* subtle studio vignette */}
         <div
           className="pointer-events-none absolute inset-0"
           style={{
@@ -31,11 +31,11 @@ export default function App() {
         />
       </div>
 
-      {/* ---------- bottom half: control dashboard ---------- */}
-      <div className="flex h-[42vh] max-h-[470px] min-h-[336px] shrink-0 flex-col gap-1.5 px-3 pb-2 pt-1">
+      {/* ---------- Responsive control dashboard ---------- */}
+      <div className="dashboard-pane flex h-[58dvh] sm:h-[46dvh] lg:h-[42dvh] max-h-[540px] sm:max-h-[470px] min-h-[300px] sm:min-h-[330px] shrink-0 flex-col gap-1 px-2 pb-2 pt-1 sm:px-3">
         <Dashboard />
-        <div className="text-center text-[9px] tracking-[0.18em] text-slate-600">
-          ↑ THROTTLE · ↓ BRAKE · ← → SHIFT · R/N/D GEAR · SPACE START/STOP — 가속 · 제동 · 변속 · 시동
+        <div className="hidden sm:block text-center text-[9px] tracking-[0.16em] text-slate-600">
+          ↑/W THROTTLE · ↓/S BRAKE · ← → SHIFT · R/N/D GEAR · A AUTO-DCT · E ECU MAP · X X-RAY · SPACE START/STOP
         </div>
       </div>
     </div>

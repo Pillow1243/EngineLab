@@ -12,21 +12,22 @@ export function useSimulationLoop() {
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
-    let prevLock = 0;
 
     const tick = (now) => {
       const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
       last = now;
 
       const s = useEngineStore.getState();
+      const pending = s._pendingEvent;
       const out = stepSim(s, dt);
       const { events, ...next } = out;
 
-      useEngineStore.setState(next);
+      if (pending) {
+        next._pendingEvent = null;
+        audioEngine.handleEvent(pending);
+      }
 
-      // DCT clunk when a shift lockout begins
-      if (next.shiftLock > 0 && prevLock === 0) audioEngine.handleEvent({ type: 'shift' });
-      prevLock = next.shiftLock;
+      useEngineStore.setState(next);
 
       audioEngine.update({ ...s, ...next });
       for (const e of events) audioEngine.handleEvent(e);

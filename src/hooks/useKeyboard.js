@@ -1,13 +1,18 @@
 import { useEffect } from 'react';
 import { useEngineStore } from '../store/engineStore.js';
-import { togglePower } from '../store/actions.js';
+import { togglePower, toggleMuteAudio } from '../store/actions.js';
+import { audioEngine } from '../audio/AudioEngine.js';
 
 /**
  * Keyboard controls:
- *   ↑        throttle
- *   ↓        brake
+ *   ↑ / W    throttle
+ *   ↓ / S    brake
  *   ← / →    shift down / up (in D)
  *   R / N / D gear mode
+ *   A        toggle Auto-Shift DCT
+ *   E        cycle ECU mode (Comfort / Sport / Track+)
+ *   X        toggle X-Ray cutaway view
+ *   M        mute / unmute audio
  *   Space    engine start / stop
  */
 export function useKeyboard() {
@@ -15,12 +20,18 @@ export function useKeyboard() {
     const st = () => useEngineStore.getState();
 
     const down = (e) => {
+      if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
       switch (e.code) {
         case 'ArrowUp':
+        case 'KeyW':
           e.preventDefault();
-          if (!e.repeat) st().setThrottle(1);
+          if (!e.repeat) {
+            audioEngine.ensure();
+            st().setThrottle(1);
+          }
           break;
         case 'ArrowDown':
+        case 'KeyS':
           e.preventDefault();
           if (!e.repeat) st().setBrake(1);
           break;
@@ -39,6 +50,18 @@ export function useKeyboard() {
         case 'KeyD':
           if (!e.repeat) st().setGearMode('D');
           break;
+        case 'KeyA':
+          if (!e.repeat) st().toggleAutoShift();
+          break;
+        case 'KeyE':
+          if (!e.repeat) st().cycleEcuMode();
+          break;
+        case 'KeyX':
+          if (!e.repeat) st().toggleXray();
+          break;
+        case 'KeyM':
+          if (!e.repeat) toggleMuteAudio();
+          break;
         case 'Space':
           e.preventDefault();
           if (!e.repeat) togglePower();
@@ -49,8 +72,8 @@ export function useKeyboard() {
     };
 
     const up = (e) => {
-      if (e.code === 'ArrowUp') st().setThrottle(0);
-      if (e.code === 'ArrowDown') st().setBrake(0);
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') st().setThrottle(0);
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') st().setBrake(0);
     };
 
     const blur = () => {

@@ -1,9 +1,9 @@
-import { useLiveAttribute, useLiveNode, useLiveText } from '../../hooks/useLiveNode.js';
+import { useLiveAttribute, useLiveNode } from '../../hooks/useLiveNode.js';
 import { REDLINE } from '../../sim/constants.js';
 
 const CX = 110;
-const CY = 118;
-const R = 90;
+const CY = 116;
+const R = 88;
 const A0 = 135;
 const A1 = 405; // 270° sweep
 const MAX = 9000;
@@ -22,7 +22,9 @@ const arc = (r, a0, a1) => {
 
 const angleOf = (rpm) => A0 + (Math.min(rpm, MAX) / MAX) * (A1 - A0);
 
-/** Circular analog tachometer, 0–9 ×1000 rpm with a 7000 rpm redline. */
+const SHIFT_THRESHOLDS = [3200, 4200, 5000, 5700, 6300, 6750, 7100, 7500];
+
+/** Circular analog tachometer, 0–9 ×1000 rpm with F1-style shift lights & 7000 rpm redline. */
 export default function Tachometer() {
   // needle — direct attribute write, 60fps, zero re-renders
   const needleRef = useLiveAttribute(
@@ -37,6 +39,18 @@ export default function Tachometer() {
   const rpmTextRef = useLiveNode((el, s) => {
     el.textContent = String(Math.max(0, Math.round(s.rpm)));
     el.style.color = s.rpm > REDLINE ? '#f87171' : '#e2e8f0';
+  });
+  // F1-style 8-LED shift light bar
+  const shiftBarRef = useLiveNode((el, s) => {
+    const leds = el.children;
+    if (!leds) return;
+    const flash = s.rpm > 7250 && Math.sin(performance.now() * 0.04) > 0;
+    for (let i = 0; i < leds.length; i++) {
+      const on = s.rpm >= SHIFT_THRESHOLDS[i];
+      const color = i < 3 ? '#34d399' : i < 6 ? '#fbbf24' : '#ef4444';
+      leds[i].style.background = on ? (flash ? '#ffffff' : color) : 'rgba(255,255,255,0.08)';
+      leds[i].style.boxShadow = on ? `0 0 8px ${color}` : 'none';
+    }
   });
 
   const ticks = [];
@@ -60,8 +74,15 @@ export default function Tachometer() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-0.5">
-      <svg viewBox="0 0 220 220" className="w-full max-w-[218px]">
+    <div className="flex h-full w-full flex-col items-center justify-between py-1.5 px-1.5 sm:py-2 sm:px-2">
+      {/* Shift light LED array */}
+      <div ref={shiftBarRef} className="flex w-full max-w-[150px] items-center justify-center gap-1 pt-0.5">
+        {SHIFT_THRESHOLDS.map((t) => (
+          <span key={t} className="h-1.5 flex-1 rounded-full bg-white/10" />
+        ))}
+      </div>
+
+      <svg viewBox="0 0 220 205" className="min-h-0 flex-1 w-full max-w-[198px]">
         {/* track */}
         <path d={arc(R, A0, A1)} fill="none" stroke="#1f2937" strokeWidth={6} strokeLinecap="round" />
         {/* redline zone 7000–9000 */}
@@ -76,7 +97,7 @@ export default function Tachometer() {
         {ticks}
         {/* labels */}
         {Array.from({ length: 10 }).map((_, k) => {
-          const [x, y] = polar(R - 24, A0 + k * 30);
+          const [x, y] = polar(R - 23, A0 + k * 30);
           return (
             <text
               key={k}
@@ -93,25 +114,30 @@ export default function Tachometer() {
             </text>
           );
         })}
-        <text x={CX} y={CY - 34} textAnchor="middle" fill="#475569" fontSize="8" letterSpacing="2">
+        <text x={CX} y={CY - 32} textAnchor="middle" fill="#64748b" fontSize="8" letterSpacing="2">
           RPM ×1000
         </text>
 
         {/* needle */}
         <g ref={needleRef} style={{ filter: 'drop-shadow(0 0 4px rgba(248,113,113,0.55))' }}>
-          <line x1={CX} y1={CY + 16} x2={CX} y2={CY - R + 10} stroke="#f87171" strokeWidth={3} strokeLinecap="round" />
+          <line x1={CX} y1={CY + 15} x2={CX} y2={CY - R + 10} stroke="#f87171" strokeWidth={3} strokeLinecap="round" />
         </g>
         <circle cx={CX} cy={CY} r={7} fill="#0b1220" stroke="#64748b" strokeWidth={1.5} />
         <circle cx={CX} cy={CY} r={2.5} fill="#f87171" />
       </svg>
 
-      <div className="-mt-1 flex items-baseline gap-1.5">
-        <span ref={rpmTextRef} className="font-mono text-[34px] font-bold leading-none tabular-nums text-slate-100">
+      <div className="-mt-1 flex items-baseline gap-1">
+        <span
+          ref={rpmTextRef}
+          className="font-mono text-lg sm:text-2xl lg:text-[32px] font-bold leading-none tabular-nums text-slate-100"
+        >
           0
         </span>
-        <span className="text-[10px] tracking-[0.2em] text-slate-500">RPM</span>
+        <span className="text-[8px] sm:text-[10px] tracking-[0.18em] text-slate-500">RPM</span>
       </div>
-      <div className="text-[8px] tracking-[0.3em] text-slate-600">TACHOMETER · 타코미터</div>
+      <div className="hidden sm:block text-[7px] lg:text-[8px] tracking-[0.26em] text-slate-600">
+        TACHOMETER · 타코미터
+      </div>
     </div>
   );
 }

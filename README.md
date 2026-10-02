@@ -2,112 +2,53 @@
 
 > **Live demo:** https://Pillow1243.github.io/EngineLab/ (auto-deployed via GitHub Actions)
 
+An interactive, dark-themed web application that simulates a **2.9L DOHC Inline-5 Turbo (직렬5 터보)**
+engine paired with a **7-speed dual-clutch transmission (7단 더블클러치)**. Features a 100% procedural
+3D engine with internal moving parts and combustion flashes, a real-time physics & thermal simulation,
+and a multi-layer procedural Web Audio synthesizer — fully responsive across **Android, iOS, tablets, and desktop**.
 
-A highly interactive, dark-themed web app that simulates a **2.9L Inline-5 Turbo (직렬5 터보)**
-engine with a **7-speed dual-clutch transmission** (7단 더블클러치). A fully procedural 3D
-engine (moving pistons, rotating crankshaft, spinning timing belt, spooling turbo) is paired
-with a physics simulation and a **fully synthesized, layered Web Audio sound engine** —
-no audio files, no external assets, no network dependencies.
+## Highlights & Features
 
-## Run
+- **3D Procedural Inline-5 Turbo Engine**:
+  - Full slider-crank kinematics (`1-2-4-5-3` firing order) with 5 pistons, 3-ring packs, connecting rods, and counterweighted crank throws.
+  - **DOHC Valvetrain**: Dual overhead camshafts rotating at ½ crank speed with 10 reciprocating intake & exhaust valves.
+  - **Live Combustion Flashes**: Electric-blue spark → fiery orange plasma flash inside each cylinder at firing TDC (`1-2-4-5-3` sequence).
+  - **X-Ray Cutaway Mode (`X`)**: Toggle translucent engine block, cylinder head, valve cover, and intake plenum to inspect internal moving parts from any angle.
+  - **Turbocharger, Intercooler & BOV**: Spinning billet compressor wheel (~14× engine speed with spool lag), finned front-mount intercooler, anodized Blow-Off Valve with visual vent pulse, and exhaust downpipe with **real EGT thermal glow** + **overrun backfire flames**.
+  - **Dynamic Engine Mounts**: Real torque-reaction roll under load, shift jolts, and 2.5-order harmonic idle vibration.
+- **Multi-Layer Synthesized Web Audio (`AudioEngine.js`)**:
+  - **8-Harmonic Inline-5 Core** (`1.25×` & `3.75×` signature off-beat warble + `2.5×` firing fundamental) through an asymmetric **Tube-Saturation WaveShaper** and dual-formant exhaust resonator.
+  - **Dual-Stage Turbo Synth**: Blade-pass whistle + high-pressure induction rush.
+  - **BOV + Compressor Surge Flutter ("Stututu")**: Pneumatic valve hiss plus decaying compressor surge chirps at high boost / Track+ mode.
+  - **Exhaust Pops & Bangs (Overrun Crackles)**: Realistic muffler detonations when lifting off at high RPM.
+  - **DCT Gearbox Whine & Rev-Match Downshift Blip**: Speed-coupled transmission whine (distinct in Reverse) + automatic throttle bark on downshifts.
+- **Interactive ECU & Transmission Controls**:
+  - **3 ECU Maps (`COMFORT` / `SPORT` / `TRACK+`)**: Changes boost target (up to `1.52 bar`), throttle aggressiveness, anti-lag spool, and overrun burbles.
+  - **Manual & Auto 7-DCT (`AUTO` / `MAN`)**: Shift manually with paddles/keys or enable automatic upshifts & rev-matched downshifts.
+  - **2-Step Launch Control**: Hold **Brake + Throttle** simultaneously at standstill to build boost on the 4100 RPM two-step limiter, then release Brake for an explosive launch with automatic **0–100 km/h timing**.
+- **100% Responsive (Android, Mobile Portrait & Landscape, Tablet, Desktop)**:
+  - Aspect-adaptive 3D camera framing so vertical phone screens never clip the engine.
+  - Ergonomic multi-touch dashboard in portrait mode and automatic side-by-side split view in mobile landscape.
+
+## Run Locally
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173  (binds 0.0.0.0)
+npm run dev        # http://localhost:5173
 npm run build      # production build
-npm run test:sim   # headless 60+ second physics self-test
+npm run test:sim   # headless physics self-test
 ```
 
 ## Controls
 
-| Input              | Action                          |
-| ------------------ | ------------------------------- |
-| `↑` (or hold pedal)| Throttle                        |
-| `↓` (or hold pedal)| Brake                           |
-| `←` / `→`          | Shift down / up (in D)          |
-| `R` / `N` / `D`    | Reverse / Neutral / Drive       |
-| `Space`            | Engine start / stop             |
-| Mouse / touch      | Orbit, zoom, view presets (정면 / 측면 / 상단 / 디테일) |
-
-Pedals support click, touch and drag-to-modulate (vertical position = pedal %).
-
-## Architecture
-
-```
-src/
-├── App.jsx                      split-screen shell (3D top / dashboard bottom)
-├── main.jsx / index.css         entry, Tailwind + glassmorphism utilities
-├── sim/
-│   ├── constants.js             gear ratios, redline, mass, inertia…
-│   └── simulation.js            pure stepSim(state, dt) → next state + events
-├── store/
-│   ├── engineStore.js           Zustand store (fast fields + discrete fields)
-│   └── actions.js               togglePower() — audio-gesture-safe start/stop
-├── audio/
-│   └── AudioEngine.js           layered Web Audio synth (see below)
-├── hooks/
-│   ├── useSimulationLoop.js     the single rAF heartbeat (physics → store → audio)
-│   ├── useKeyboard.js           keyboard controls
-│   └── useLiveNode.js           60fps direct-DOM store bindings (no re-renders)
-└── components/
-    ├── scene/                   Three.js via @react-three/fiber + drei
-    │   ├── EngineScene.jsx      canvas, studio lighting, env reflections, floor grid
-    │   ├── EngineModel.jsx      block, head, manifolds, plenum, gearbox, flywheel
-    │   ├── CrankTrain.jsx       pistons + rods + crank (full slider-crank kinematics)
-    │   ├── Turbocharger.jsx     volute + spinning compressor wheel (spool-scaled)
-    │   ├── TimingBelt.jsx       crank/cam pulleys, idler, scrolling ribbed belt
-    │   └── CameraRig.jsx        eased camera flights for the 4 view presets
-    └── hud/                     Tailwind dashboard
-        ├── Tachometer.jsx       analog 0–9k needle + redline + digital rpm
-        ├── BoostGauge.jsx       boost dial, turbo LED, spool bar
-        ├── SpeedPanel.jsx       km/h + Start/Stop button
-        ├── GearStrip.jsx        R/N/D + 7 gears + ▲▼ + DCT lockout bar
-        ├── Pedals.jsx           interactive throttle/brake with % fill
-        ├── Telemetry.jsx        live torque / wheel rpm / ratio / traction
-        └── …overlays            title, view buttons, big gear readout
-```
-
-### Physics (`sim/simulation.js`)
-
-- **Idle governor** settles the engine at ~880 rpm; idle is maintained in gear (DCT
-  idle-hold under the brake, gentle creep at standstill).
-- **Torque curve**: piecewise base torque × (0.2 + 0.8·throttle) × (1 + 1.02·boost),
-  with a turbo droop above ~4600 rpm and a 8500 rpm rev limiter.
-- **Transmission**: 7 DCT ratios + final drive. The clutch model distinguishes
-  *locked* (rpm = wheel rpm, forces shared), *slipping* (launch control / engine
-  braking / downshift blips) and *disengaged* (shift lockout or hard brake —
-  exactly what a real DCT does). Shifting bleeds ~20% of rpm over 0.42 s.
-- **Turbo**: boost (0–1.38 bar) builds with a first-order lag while the throttle is
-  open above ~1400 rpm; it bleeds off on lift-off. A **BOV** event fires on
-  high-boost throttle cuts.
-- **Vehicle**: mass, rolling resistance, aero drag, traction limit, 9.5 kN brake.
-
-Run `npm run test:sim` — it drives the engine for 60+ simulated seconds and asserts
-ignition, idle stability, free revving, launch, shift dip, BOV, braking and shutdown.
-
-### Audio (`audio/AudioEngine.js`)
-
-Everything is synthesized live (created inside a user gesture, autoplay-safe):
-
-| Layer    | Source                                                        | Driven by                          |
-| -------- | ------------------------------------------------------------- | ---------------------------------- |
-| 1 Core   | 6 oscillators at inline-5 firing harmonics (2.5·k · rpm/60)   | rpm (pitch + level), lowpass tilt  |
-| 1b       | band-passed noise crackle                                     | rpm², throttle                     |
-| 2 Exhaust| high band-pass noise (panned right)                           | fades in above ~2000 rpm           |
-| 3 Turbo  | sine whistle + 13 Hz vibrato + high-pass intake whoosh        | boost, spool                       |
-| 4 BOV    | one-shot: lowpass-swept noise burst + falling sine whistle    | throttle cut while boost > 0.4 bar |
-| FX       | starter whine, ignition bark, DCT clunk, limiter chop         | sim events                         |
-
-All continuous parameters are written with `setTargetAtTime` every frame → smooth,
-zipper-free response at 60 fps.
-
-### Rendering notes
-
-- The engine is 100 % procedural Three.js geometry (no glTF): slider-crank kinematics
-  solved per frame — `y(α) = R·cos α + √(L² − R²sin²α)` with the BMW inline-5
-  crank-pin phasing (firing order 1-2-4-5-3).
-- Metallic reflections come from a procedural `Environment` (Lightformers) — no HDR
-  downloads, works offline.
-- The HUD writes 60 fps values (needle, digital readouts, fills, LEDs) **directly to
-  the DOM** via rAF-throttled Zustand subscriptions — zero React re-renders on the hot
-  path, no layout shifts (fixed grid, tabular numerals).
+| Input              | Action                                                  |
+| ------------------ | ------------------------------------------------------- |
+| `↑` / `W` or Pedal | Throttle (drag vertically on pedal to modulate 0–100%)  |
+| `↓` / `S` or Pedal | Brake (hold Brake + Throttle at rest = Launch Control)  |
+| `←` / `→`          | Shift down (with rev-match blip) / Shift up             |
+| `R` / `N` / `D`    | Reverse / Neutral / Drive                               |
+| `A`                | Toggle Automatic / Manual 7-DCT shifting                |
+| `E`                | Cycle ECU Map (`COMFORT` → `SPORT` → `TRACK+`)          |
+| `X`                | Toggle X-Ray Cutaway view (`투시`)                       |
+| `M`                | Mute / Unmute synthesized audio                         |
+| `Space`            | Engine Start / Stop                                     |

@@ -12,4 +12,12 @@ export async function togglePower() {
   store.togglePower();
   const s = useEngineStore.getState();
   if (s.cranking) audioEngine.playStart();
+  else if (!s.running) audioEngine.playShutdown();
+}
+
+export async function toggleMuteAudio() {
+  await audioEngine.ensure();
+  useEngineStore.getState().toggleMute();
+  const { muted } = useEngineStore.getState();
+  audioEngine.setMuted(muted);
 }
