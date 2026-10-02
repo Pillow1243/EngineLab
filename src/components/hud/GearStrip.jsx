@@ -32,7 +32,9 @@ export default function GearStrip() {
   const modeBtn = (m) => (
     <button
       key={m}
+      type="button"
       onClick={() => setGearMode(m)}
+      aria-pressed={gearMode === m}
       className={`chip flex h-8 w-8 sm:h-10 sm:w-10 lg:h-11 lg:w-11 shrink-0 items-center justify-center text-xs sm:text-sm font-black ${
         gearMode === m ? 'chip-active' : ''
       }`}
@@ -48,7 +50,10 @@ export default function GearStrip() {
         <div className="flex items-center gap-1">{['R', 'N', 'D'].map(modeBtn)}</div>
 
         <button
+          type="button"
           onClick={toggleAutoShift}
+          aria-label={autoShift ? 'Disable automatic shifting' : 'Enable automatic shifting'}
+          aria-pressed={autoShift}
           className={`chip h-8 sm:h-10 lg:h-11 px-1.5 sm:px-2 text-[9px] sm:text-[10px] font-extrabold tracking-wider shrink-0 ${
             autoShift
               ? 'border-emerald-400/50 bg-emerald-400/15 text-emerald-300 shadow-[0_0_12px_-3px_rgba(52,211,153,0.5)]'
@@ -65,7 +70,10 @@ export default function GearStrip() {
           {GEAR_RATIOS.map((_, i) => (
             <button
               key={i}
+              type="button"
               onClick={() => selectGear(i + 1)}
+              aria-label={`Select gear ${i + 1}`}
+              aria-pressed={gearMode === 'D' && gearPos === i + 1}
               className={`chip flex h-8 sm:h-10 lg:h-11 items-center justify-center font-mono text-xs sm:text-sm font-bold transition-all ${
                 gearMode === 'D' && gearPos === i + 1
                   ? 'chip-active scale-[1.03]'
@@ -73,7 +81,6 @@ export default function GearStrip() {
                     ? 'opacity-35'
                     : ''
               }`}
-              aria-label={`Gear ${i + 1}`}
             >
               {i + 1}
             </button>
@@ -83,6 +90,7 @@ export default function GearStrip() {
         <div className="mx-0.5 h-7 sm:h-8 w-px bg-white/10 shrink-0" />
         <div className="flex sm:flex-col gap-1 shrink-0">
           <button
+            type="button"
             onClick={shiftDown}
             className="chip h-8 sm:h-[22px] lg:h-[25px] px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-bold"
             aria-label="Shift down"
@@ -90,6 +98,7 @@ export default function GearStrip() {
             ▼
           </button>
           <button
+            type="button"
             onClick={shiftUp}
             className="chip h-8 sm:h-[22px] lg:h-[25px] px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-bold"
             aria-label="Shift up"

@@ -235,3 +235,71 @@ export const ECU_MODES = {
     color: '#f97316',
   },
 };
+
+/** One-click, internally consistent garage configurations. */
+export const BUILD_PRESETS = [
+  {
+    id: 'rs-street',
+    name: 'RS Street',
+    subtitle: 'I5 · single turbo · balanced',
+    config: {
+      engineType: 'I5_29',
+      aspiration: 'SINGLE_TURBO',
+      ecuMode: 'SPORT',
+      internalsUpgrade: 'STOCK',
+      exhaustUpgrade: 'SPORT',
+      transUpgrade: 'STREET',
+      tireUpgrade: 'STREET',
+      autoShift: false,
+      nosInstalled: true,
+    },
+  },
+  {
+    id: 'i4-time-attack',
+    name: 'Time Attack',
+    subtitle: 'I4 · ITBs · light & high-revving',
+    config: {
+      engineType: 'I4_20',
+      aspiration: 'NA',
+      ecuMode: 'TRACK',
+      internalsUpgrade: 'FORGED',
+      exhaustUpgrade: 'TITANIUM',
+      transUpgrade: 'RACE_DOG',
+      tireUpgrade: 'SEMI_SLICK',
+      autoShift: false,
+      nosInstalled: false,
+    },
+  },
+  {
+    id: 'i6-twin-turbo',
+    name: 'Twin-Turbo 2JZ',
+    subtitle: 'I6 · twin turbo · drag slicks',
+    config: {
+      engineType: 'I6_30',
+      aspiration: 'TWIN_TURBO',
+      ecuMode: 'TRACK',
+      internalsUpgrade: 'FORGED',
+      exhaustUpgrade: 'TITANIUM',
+      transUpgrade: 'RACE_DOG',
+      tireUpgrade: 'DRAG_SLICK',
+      autoShift: true,
+      nosInstalled: true,
+    },
+  },
+  {
+    id: 'v8-gt',
+    name: 'V8 GT',
+    subtitle: 'V8 · supercharged · grand touring',
+    config: {
+      engineType: 'V8_40',
+      aspiration: 'SUPERCHARGER',
+      ecuMode: 'SPORT',
+      internalsUpgrade: 'FORGED',
+      exhaustUpgrade: 'TITANIUM',
+      transUpgrade: 'STREET',
+      tireUpgrade: 'SEMI_SLICK',
+      autoShift: true,
+      nosInstalled: true,
+    },
+  },
+];

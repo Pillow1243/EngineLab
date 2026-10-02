@@ -14,11 +14,14 @@ export default function ViewButtons() {
   const setView = useEngineStore((s) => s.setView);
 
   return (
-    <div className="absolute right-2.5 top-2.5 sm:right-4 sm:top-3.5 z-10 flex flex-wrap justify-end gap-1 sm:gap-1.5 max-w-[46%] sm:max-w-none">
+    <div className="hud-safe-tr absolute z-10 flex max-w-[46%] flex-wrap justify-end gap-1 sm:max-w-none sm:gap-1.5">
       {VIEWS.map((v) => (
         <button
           key={v.id}
+          type="button"
           onClick={() => setView(v.id)}
+          aria-label={`Camera view: ${v.en.toLowerCase()}`}
+          aria-pressed={view === v.id}
           className={`rounded-lg border px-2 py-1 sm:px-3 sm:py-1.5 text-[8px] sm:text-[10px] font-semibold tracking-wider backdrop-blur-xl transition-all duration-150 active:scale-[0.95] ${
             view === v.id
               ? 'border-cyan-400/50 bg-cyan-400/20 text-cyan-200 shadow-[0_0_16px_-3px_rgba(34,211,238,0.55)]'

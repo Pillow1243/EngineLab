@@ -19,6 +19,8 @@ class AudioEngine {
     this.ctx = null;
     this.nodes = null;
     this.muted = false;
+    this.volume = 0.72;
+    this._lastUpdateTime = 0;
   }
 
   get ready() {
@@ -30,7 +32,12 @@ class AudioEngine {
     if (!this.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
-      this.ctx = new AC();
+      try {
+        this.ctx = new AC({ latencyHint: 'interactive' });
+      } catch {
+        // Older WebKit versions may not accept AudioContext options.
+        this.ctx = new AC();
+      }
       this._build();
     }
     if (this.ctx.state === 'suspended') {
@@ -44,9 +51,21 @@ class AudioEngine {
 
   setMuted(m) {
     this.muted = !!m;
-    if (this.ready && this.nodes?.master) {
-      this.nodes.master.gain.setTargetAtTime(this.muted ? 0 : 0.94, this.ctx.currentTime, 0.04);
-    }
+    this._applyMasterLevel();
+  }
+
+  setVolume(value) {
+    this.volume = clamp(Number(value) || 0, 0, 1);
+    this._applyMasterLevel();
+  }
+
+  _applyMasterLevel() {
+    if (!this.ready || !this.nodes?.master) return;
+    this.nodes.master.gain.setTargetAtTime(
+      this.muted ? 0 : this.volume,
+      this.ctx.currentTime,
+      0.04,
+    );
   }
 
   /** Custom Fourier PeriodicWave shaped like a real cylinder exhaust blowdown pressure pulse. */
@@ -164,7 +183,7 @@ class AudioEngine {
 
     /* ---------------- Master bus & compressor ---------------- */
     N.master = c.createGain();
-    N.master.gain.value = this.muted ? 0 : 0.94;
+    N.master.gain.value = this.muted ? 0 : this.volume;
 
     N.subBoost = c.createBiquadFilter();
     N.subBoost.type = 'lowshelf';
@@ -386,6 +405,10 @@ class AudioEngine {
     if (!this.ready) return;
     const c = this.ctx;
     const t = c.currentTime;
+    // The sound controls are smoothed in Web Audio; 30 Hz automation is ample
+    // and avoids queuing thousands of redundant AudioParam events per second.
+    if (this._lastUpdateTime && t - this._lastUpdateTime < 1 / 30) return;
+    this._lastUpdateTime = t;
     const N = this.nodes;
     const {
       rpm,
@@ -400,6 +423,7 @@ class AudioEngine {
       exhaustUpgrade = 'SPORT',
       transUpgrade = 'STREET',
       nosActive = false,
+      nosInstalled = true,
     } = s;
 
     const engSpec = ENGINES[engineType] || ENGINES.I5_29;
@@ -493,7 +517,7 @@ class AudioEngine {
     // Layer 3 — Forced Induction: Single Turbo / Twin-Turbo / Supercharger / NA + NOS
     if (aspiration === 'NA') {
       N.twG.gain.setTargetAtTime(0, t, 0.08);
-      N.whG.gain.setTargetAtTime(nosActive && th > 0.4 ? 0.16 : 0, t, 0.08);
+      N.whG.gain.setTargetAtTime(nosInstalled && nosActive && th > 0.4 ? 0.16 : 0, t, 0.08);
     } else if (aspiration === 'SUPERCHARGER') {
       // Twin-Screw Supercharger belt-driven gear whine
       const scFreq = 480 + rpm * 0.62;
@@ -504,7 +528,7 @@ class AudioEngine {
       const scGain = on ? (0.04 + 0.26 * th) * clamp((rpm - 900) / 5500, 0.1, 1.1) : 0;
       N.twG.gain.setTargetAtTime(scGain, t, 0.06);
       N.whHP.frequency.setTargetAtTime(2600 + rpm * 0.35, t, 0.08);
-      N.whG.gain.setTargetAtTime(boost * 0.09 + (nosActive && th > 0.4 ? 0.15 : 0), t, 0.08);
+      N.whG.gain.setTargetAtTime(boost * 0.09 + (nosInstalled && nosActive && th > 0.4 ? 0.15 : 0), t, 0.08);
     } else {
       // Single Turbo or Bi-Turbo (Twin-Turbo)
       const isTwin = aspiration === 'TWIN_TURBO';
@@ -517,7 +541,7 @@ class AudioEngine {
       N.twG.gain.setTargetAtTime(boost * (isTwin ? 0.29 : 0.26) + spool * 0.035, t, 0.09);
       N.whHP.frequency.setTargetAtTime(2800 + spool * 2600, t, 0.09);
       N.whG.gain.setTargetAtTime(
-        boost * (isTwin ? 0.15 : 0.12) + (nosActive && th > 0.4 ? 0.15 : 0),
+        boost * (isTwin ? 0.15 : 0.12) + (nosInstalled && nosActive && th > 0.4 ? 0.15 : 0),
         t,
         0.08,
       );

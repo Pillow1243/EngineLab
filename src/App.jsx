@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import EngineScene from './components/scene/EngineScene.jsx';
 import Dashboard from './components/hud/Dashboard.jsx';
 import TopOverlay from './components/hud/TopOverlay.jsx';
@@ -6,6 +7,28 @@ import GearOverlay from './components/hud/GearOverlay.jsx';
 import TuningModal from './components/hud/TuningModal.jsx';
 import { useSimulationLoop } from './hooks/useSimulationLoop.js';
 import { useKeyboard } from './hooks/useKeyboard.js';
+import { useEngineStore } from './store/engineStore.js';
+import { audioEngine } from './audio/AudioEngine.js';
+
+function AudioPreferenceSync() {
+  useEffect(() => {
+    const stopVolume = useEngineStore.subscribe(
+      (s) => s.volume,
+      (volume) => audioEngine.setVolume(volume),
+      { fireImmediately: true },
+    );
+    const stopMute = useEngineStore.subscribe(
+      (s) => s.muted,
+      (muted) => audioEngine.setMuted(muted),
+      { fireImmediately: true },
+    );
+    return () => {
+      stopVolume();
+      stopMute();
+    };
+  }, []);
+  return null;
+}
 
 export default function App() {
   useSimulationLoop();
@@ -16,6 +39,7 @@ export default function App() {
       className="app-shell flex h-dvh w-full flex-col overflow-hidden bg-[#04060a] text-slate-200"
       onContextMenu={(e) => e.preventDefault()}
     >
+      <AudioPreferenceSync />
       {/* ---------- 3D engine viewport ---------- */}
       <div className="viewport-pane relative min-h-[210px] flex-1">
         <EngineScene />
@@ -36,7 +60,7 @@ export default function App() {
       <div className="dashboard-pane flex h-[58dvh] sm:h-[46dvh] lg:h-[42dvh] max-h-[540px] sm:max-h-[470px] min-h-[300px] sm:min-h-[330px] shrink-0 flex-col gap-1 px-2 pb-2 pt-1 sm:px-3">
         <Dashboard />
         <div className="hidden sm:block text-center text-[9px] tracking-[0.16em] text-slate-600">
-          ↑/W GAS · ↓/S BRAKE · ← → SHIFT · R/N/D GEAR · A AUTO-DCT · G GARAGE/TUNING · SHIFT N₂O · X X-RAY · SPACE START/STOP
+          ↑/W THROTTLE · ↓/S BRAKE · ←/→ SHIFT · R/N/D GEAR · A AUTO · E ECU · G GARAGE · SHIFT N₂O · X X-RAY · M MUTE · SPACE ENGINE
         </div>
       </div>
 

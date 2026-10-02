@@ -5,8 +5,12 @@
 An interactive 3D powertrain & dyno simulator featuring **4 swappable engines (`I4`, `I5`, `I6`, `V8`)**,
 **4 forced-induction systems (`Naturally Aspirated ITB`, `Single Turbo`, `Bi-Turbo / Twin-Turbo`, `Twin-Screw Supercharger`)**,
 a **7-speed dual-clutch transmission (`7-DCT`)**, a **Live Dyno & Parts Tuning Workshop**, and a
-next-generation procedural **Web Audio Convolver + PeriodicWave Sound Synthesizer** — fully responsive
-across **Android, iOS, tablets, and desktop**.
+procedural **Web Audio Convolver + PeriodicWave sound synthesizer** — responsive across **Android, iOS,
+tablets, and desktop**. The engine audio is generated in real time in the browser; it is not a recording
+of a specific production engine, and the dyno output is a simulation estimate rather than certified test data.
+
+Build selections, camera view, ECU map, and audio preferences are saved locally in the browser. No account
+or external sound/image download is required.
 
 ## Engine Garage & Tuning Workshop (`G` or `🔧 TUNING / GARAGE`)
 
@@ -27,13 +31,19 @@ across **Android, iOS, tablets, and desktop**.
   - **Tires**: `Street Radial (0.92G)` vs `Semi-Slick R888 (1.22G)` vs `Drag Radial Slick (1.55G)`.
   - **N₂O Nitrous Shot (`⚡ N₂O SHOT` or `Shift`)**: Instant +155 Nm torque boost with electric-blue cylinder combustion plasma flames.
 
+### Quick Builds, Sound & Responsiveness
+
+The Garage includes four one-click setups: **RS Street**, **Time Attack**, **Twin-Turbo 2JZ**, and **V8 GT**. Selecting a preset changes the engine, aspiration, ECU, internal parts, exhaust, transmission, tires, and nitrous installation together. Individual changes can still be made afterward and persist on this device.
+
+Use the **SOUND** slider in the 3D viewport to set the master output level or mute/unmute. Audio starts only after a user gesture, in line with browser autoplay rules. Automation is smoothed and throttled to reduce unnecessary Web Audio work, and the 3D renderer adapts pixel ratio under load.
+
 ## Controls
 
 | Input                | Action                                                  |
 | -------------------- | ------------------------------------------------------- |
 | `↑` / `W` or Pedal   | Throttle (drag vertically on pedal to modulate 0–100%)  |
 | `↓` / `S` or Pedal   | Brake (hold Brake + Throttle at rest = Launch Control)  |
-| `Shift` or `⚡ N₂O`  | Fire N₂O Nitrous Oxide Shot                             |
+| `Shift` or `⚡ N₂O`  | Hold with throttle to fire the N₂O shot                  |
 | `←` / `→`            | Shift down (with rev-match blip) / Shift up             |
 | `R` / `N` / `D`      | Reverse / Neutral / Drive                               |
 | `G`                  | Open / Close Garage & Dyno Tuning Workshop              |
@@ -42,3 +52,15 @@ across **Android, iOS, tablets, and desktop**.
 | `X`                  | Toggle X-Ray Cutaway view (`투시`)                       |
 | `M`                  | Mute / Unmute synthesized audio                         |
 | `Space`              | Engine Start / Stop                                     |
+
+The touch pedals can also receive keyboard focus: use arrow keys to adjust in 5% steps, `Shift` + arrow for 20% steps, and `Home` / `End` for zero / full input. Driving hotkeys are suspended while the tuning dialog is open so its controls can be used safely.
+
+## Local development & checks
+
+```sh
+npm ci
+npm test
+npm run build
+```
+
+The deployment workflow runs the simulation checks before building and publishing to GitHub Pages.

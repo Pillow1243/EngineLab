@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { useEngineStore } from '../../store/engineStore.js';
 import { ENGINES } from '../../sim/constants.js';
 import { MAT } from './materials.js';
-import { CRANK_Y, R, L, DEG, visualAngle } from './engineGeometry.js';
+import { CRANK_Y, R, L, DEG, visualAngle, engineCycleAngle } from './engineGeometry.js';
 
 const TWO_PI = Math.PI * 2;
 const FOUR_PI = Math.PI * 4;
@@ -50,10 +50,11 @@ export default function CrankTrain() {
   );
 
   useFrame((_, dt) => {
-    const { rpm, running, throttle, boost, nosActive } = useEngineStore.getState();
+    const { rpm, running, throttle, boost, nosActive, nosInstalled } = useEngineStore.getState();
     angle.current = (angle.current + (rpm / 60) * TWO_PI * dt) % FOUR_PI;
     const a0 = angle.current;
     visualAngle.value = a0 % TWO_PI;
+    engineCycleAngle.value = a0 % FOUR_PI;
 
     if (inCam.current) inCam.current.rotation.x = a0 * 0.5;
     if (exCam.current) exCam.current.rotation.x = -a0 * 0.5;
@@ -123,7 +124,7 @@ export default function CrankTrain() {
         const p = 1 - cyc / 0.75;
         const load = 0.45 + 0.55 * Math.min(1, throttle + boost * 0.5);
         mat.opacity = Math.pow(p, 1.45) * 0.95 * load;
-        if (nosActive && throttle > 0.4) {
+        if (nosInstalled && nosActive && throttle > 0.4) {
           mat.color.setHex(0x38bdf8); // Nitrous cyan-blue plasma flame!
         } else if (cyc < 0.15) {
           mat.color.setHex(0x60a5fa);

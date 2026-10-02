@@ -1,7 +1,7 @@
 import { useLiveNode } from '../../hooks/useLiveNode.js';
 import { useEngineStore } from '../../store/engineStore.js';
 import { ENGINES } from '../../sim/constants.js';
-import { visualAngle } from '../scene/engineGeometry.js';
+import { engineCycleAngle, DEG } from '../scene/engineGeometry.js';
 
 /**
  * Bottom-left & bottom-right 3D viewport HUD overlay:
@@ -36,19 +36,41 @@ export default function GearOverlay() {
     const children = el.children;
     const n = children ? children.length : 0;
     if (!n) return;
+
+    // Find the most recently fired cylinder from the engine's actual 720° firing map.
+    // The highlighted numeral is displayed in firing-order sequence, not cylinder order.
+    const cycle = engineCycleAngle.value;
+    const cycleLength = Math.PI * 4;
+    let lastAge = cycleLength;
+    let nextGap = cycleLength;
+    let firedCylinder = -1;
+    for (let cylinder = 0; cylinder < spec.fireAngles720.length; cylinder++) {
+      const fireAt = spec.fireAngles720[cylinder] * DEG;
+      const age = ((cycle - fireAt) % cycleLength + cycleLength) % cycleLength;
+      const until = ((fireAt - cycle) % cycleLength + cycleLength) % cycleLength;
+      if (age < lastAge) {
+        lastAge = age;
+        firedCylinder = cylinder + 1;
+      }
+      if (until > 1e-5 && until < nextGap) nextGap = until;
+    }
+
     const on = s.running && s.rpm > 120;
-    const idx = Math.floor(((visualAngle.value / (Math.PI * 2)) * n) % n);
+    const displayIndex = spec.firingOrder.indexOf(firedCylinder);
+    const fade = Math.max(0, 1 - lastAge / Math.max(0.001, lastAge + nextGap));
+    const color = s.nosInstalled && s.nosActive ? '#38bdf8' : '#fb923c';
     for (let i = 0; i < n; i++) {
-      const active = on && i === idx;
-      children[i].style.background = active ? (s.nosActive ? '#38bdf8' : '#fb923c') : 'rgba(255,255,255,0.12)';
-      children[i].style.boxShadow = active ? `0 0 8px ${s.nosActive ? '#38bdf8' : '#f97316'}` : 'none';
+      const active = on && i === displayIndex;
+      children[i].style.background = active ? color : 'rgba(255,255,255,0.12)';
+      children[i].style.boxShadow = active ? `0 0 ${4 + fade * 7}px ${color}` : 'none';
       children[i].style.color = active ? '#04060a' : '#94a3b8';
+      children[i].style.opacity = active ? String(0.55 + fade * 0.45) : '0.7';
     }
   });
 
   return (
     <>
-      <div className="pointer-events-none absolute bottom-2.5 left-3 sm:bottom-4 sm:left-5 z-10 flex items-end gap-2 sm:gap-3">
+      <div className="hud-safe-bl pointer-events-none absolute z-10 flex items-end gap-2 sm:gap-3">
         <div>
           <div className="mb-0.5 text-[7px] sm:text-[9px] tracking-[0.28em] text-slate-500">
             GEAR · 기어
@@ -77,7 +99,7 @@ export default function GearOverlay() {
       </div>
 
       {/* Live Firing Order Sequencer (adapts to I4 / I5 / I6 / V8) */}
-      <div className="pointer-events-none absolute bottom-2.5 right-3 sm:bottom-4 sm:right-5 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 backdrop-blur-md">
+      <div className="hud-safe-br pointer-events-none absolute z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 backdrop-blur-md">
         <span className="text-[7px] sm:text-[8px] font-semibold tracking-[0.16em] text-slate-400">
           FIRING
         </span>

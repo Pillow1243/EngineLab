@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, Lightformer, Grid } from '@react-three/drei';
+import { OrbitControls, Environment, Lightformer, Grid, AdaptiveDpr } from '@react-three/drei';
+import * as THREE from 'three';
 import { useEngineStore } from '../../store/engineStore.js';
 import EngineModel from './EngineModel.jsx';
 import CameraRig from './CameraRig.jsx';
@@ -15,11 +16,22 @@ export default function EngineScene() {
   return (
     <Canvas
       shadows
-      dpr={[1, 1.8]}
+      dpr={[1, 1.65]}
       camera={{ position: [-3.3, 1.05, 1.35], fov: 40 }}
-      gl={{ antialias: true, powerPreference: 'high-performance' }}
+      gl={{
+        antialias: true,
+        powerPreference: 'high-performance',
+        toneMapping: THREE.ACESFilmicToneMapping,
+        toneMappingExposure: 1.05,
+      }}
       className="!absolute inset-0"
+      fallback={
+        <div className="flex h-full w-full items-center justify-center bg-[#04060a] px-6 text-center text-sm text-slate-300">
+          This 3D engine view needs WebGL. Enable hardware acceleration or try a modern browser.
+        </div>
+      }
     >
+      <AdaptiveDpr />
       <color attach="background" args={['#04060a']} />
       <fog attach="fog" args={['#04060a', 9, 20]} />
 
@@ -99,6 +111,7 @@ export default function EngineScene() {
       <CameraRig view={view} />
       <OrbitControls
         makeDefault
+        regress
         enableDamping
         dampingFactor={0.08}
         minDistance={1.4}

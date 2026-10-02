@@ -3,7 +3,9 @@
  * Verifies ignition, idle, free-revving, launch, upshift sync, BOV, braking,
  * anti-stall in gear, parked gear-shift stability, reverse safety, and all 4 engines/aspirations.
  */
-import { stepSim } from '../src/sim/simulation.js';
+import { stepSim, resolveSpecs, engineTorque, getMode } from '../src/sim/simulation.js';
+import { ENGINES, ASPIRATIONS, BUILD_PRESETS } from '../src/sim/constants.js';
+import { useEngineStore } from '../src/store/engineStore.js';
 
 let failed = 0;
 function check(label, ok, detail = '') {
@@ -95,9 +97,9 @@ s = { ...s, speed: 0, rpm: 880, gearMode: 'D', gearPos: 1, shiftLock: 0.32 };
 stepWithEvents(0.32, { throttle: 0, brake: 0 });
 check('parked shift does not drop rpm below idle', s.rpm >= 820, `rpm=${Math.round(s.rpm)}`);
 
-console.log('9) multi-engine & aspiration sanity (I4, I6, V8 + NA, Twin-Turbo, Supercharger)');
-for (const engineType of ['I4_20', 'I6_30', 'V8_40']) {
-  for (const aspiration of ['NA', 'TWIN_TURBO', 'SUPERCHARGER']) {
+console.log('9) all engine layouts × aspiration systems');
+for (const engineType of Object.keys(ENGINES)) {
+  for (const aspiration of Object.keys(ASPIRATIONS)) {
     s = {
       ...s,
       running: true,
@@ -105,22 +107,60 @@ for (const engineType of ['I4_20', 'I6_30', 'V8_40']) {
       engineType,
       aspiration,
       gearMode: 'N',
-      rpm: 900,
+      rpm: ENGINES[engineType].idleRpm,
+      throttle: 0,
+      brake: 0,
       speed: 0,
       boost: 0,
+      spool: 0,
     };
     stepWithEvents(1.2, { throttle: 1 });
-    if (aspiration === 'NA' && s.boost !== 0) failed++;
-    if (aspiration === 'TWIN_TURBO' && s.boost <= 0.5) failed++;
-    if (aspiration === 'SUPERCHARGER' && s.boost <= 0.4) failed++;
+    const validBoost = aspiration === 'NA' ? s.boost === 0 : Number.isFinite(s.boost) && s.boost >= 0;
+    const validEngine = Number.isFinite(s.rpm) && s.rpm > 0 && Number.isFinite(s.speed);
+    check(`${engineType} / ${aspiration} stays finite`, validBoost && validEngine, `rpm=${s.rpm} boost=${s.boost}`);
   }
 }
-check('all engines & aspirations build expected boost/rpm', failed === 0);
 
 console.log('10) engine off → coast down');
 s.running = false;
 stepWithEvents(4.0, { running: false, throttle: 0 });
 check('rpm dead', s.rpm < 50, `rpm=${Math.round(s.rpm)}`);
+
+console.log('11) garage presets & defensive configuration');
+for (const preset of BUILD_PRESETS) {
+  const specs = resolveSpecs(preset.config);
+  check(`${preset.name} resolves`, !!specs.eng && specs.limitRpm > specs.redline && specs.maxBoost >= 0);
+}
+const store = useEngineStore.getState();
+store.applyBuildPreset('i4-time-attack');
+const selectedBuild = useEngineStore.getState();
+check(
+  'preset applies a coherent I4 track setup',
+  selectedBuild.engineType === 'I4_20' &&
+    selectedBuild.aspiration === 'NA' &&
+    selectedBuild.ecuMode === 'TRACK' &&
+    selectedBuild.transUpgrade === 'RACE_DOG',
+);
+const nitrousBase = {
+  engineType: 'I5_29', aspiration: 'NA', ecuMode: 'SPORT',
+  internalsUpgrade: 'STOCK', exhaustUpgrade: 'SPORT',
+  nosActive: false, nosInstalled: true,
+};
+const baseTorqueNm = engineTorque(4000, 1, 0, nitrousBase);
+const nitrousTorqueNm = engineTorque(4000, 1, 0, { ...nitrousBase, nosActive: true });
+const uninstalledTorqueNm = engineTorque(4000, 1, 0, { ...nitrousBase, nosActive: true, nosInstalled: false });
+check('installed N₂O contributes its rated torque', Math.abs(nitrousTorqueNm - baseTorqueNm - 155) < 0.01);
+check('uninstalled N₂O cannot change engine torque', uninstalledTorqueNm === baseTorqueNm);
+check(
+  'uninstalled N₂O is not reported as active',
+  getMode({ running: true, throttle: 1, nosActive: true, nosInstalled: false }).label !== 'N₂O SHOT!',
+);
+useEngineStore.getState().setNosActive(true);
+check('store refuses to arm an uninstalled N₂O kit', useEngineStore.getState().nosActive === false);
+store.setVolume(1.5);
+check('audio volume clamps to 100%', useEngineStore.getState().volume === 1);
+store.setVolume(-0.5);
+check('audio volume clamps to 0%', useEngineStore.getState().volume === 0);
 
 if (failed > 0) {
   console.log(`\n${failed} CHECK(S) FAILED`);

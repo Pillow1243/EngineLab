@@ -71,7 +71,9 @@ export default function InfoPanel() {
             return (
               <button
                 key={a.id}
+                type="button"
                 onClick={() => setAspiration(a.id)}
+                aria-pressed={active}
                 className={`rounded-md border py-1 text-[7px] sm:text-[8px] font-bold tracking-wider transition-all active:scale-95 ${
                   active
                     ? 'border-cyan-400/60 bg-cyan-400/20 text-cyan-200 shadow-[0_0_10px_-3px_rgba(34,211,238,0.55)]'
@@ -96,7 +98,9 @@ export default function InfoPanel() {
             return (
               <button
                 key={m.id}
+                type="button"
                 onClick={() => setEcuMode(m.id)}
+                aria-pressed={active}
                 className={`rounded-md border py-0.5 sm:py-1 text-[8px] sm:text-[9px] font-bold tracking-wider transition-all active:scale-95 ${
                   active
                     ? 'border-cyan-400/60 bg-cyan-400/20 text-cyan-200 shadow-[0_0_12px_-3px_rgba(34,211,238,0.55)]'

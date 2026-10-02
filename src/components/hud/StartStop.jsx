@@ -14,9 +14,12 @@ export default function StartStop() {
 
   return (
     <button
+      type="button"
       onClick={togglePower}
       className={`flex h-14 w-14 sm:h-16 sm:w-16 lg:h-[84px] lg:w-[84px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border border-white/10 bg-white/[0.04] transition-all duration-150 active:scale-95 ${cls}`}
-      aria-label="Engine start/stop"
+      aria-label={running ? 'Stop engine' : cranking ? 'Engine is cranking' : 'Start engine'}
+      aria-pressed={running}
+      aria-busy={cranking}
     >
       <svg
         className="h-4 w-4 sm:h-5 sm:w-5"

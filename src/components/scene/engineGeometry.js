@@ -11,5 +11,6 @@ export const XS = [-0.64, -0.32, 0, 0.32, 0.64]; // cylinder positions
 export const PHASES = [0, 144, 216, 288, 72]; // degrees
 export const DEG = Math.PI / 180;
 
-/* Shared mutable angle so every rotating part stays phase-locked. */
+/* Shared mutable crank angles keep the visible parts and cylinder sequencer phase-locked. */
 export const visualAngle = { value: 0 };
+export const engineCycleAngle = { value: 0 };

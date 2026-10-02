@@ -1,5 +1,6 @@
 import { useEngineStore } from '../../store/engineStore.js';
 import { toggleMuteAudio } from '../../store/actions.js';
+import { audioEngine } from '../../audio/AudioEngine.js';
 import { ENGINES, ASPIRATIONS } from '../../sim/constants.js';
 
 function Pill({ children, tone = 'slate', onClick, active }) {
@@ -12,7 +13,9 @@ function Pill({ children, tone = 'slate', onClick, active }) {
   const Tag = onClick ? 'button' : 'span';
   return (
     <Tag
+      type={onClick ? 'button' : undefined}
       onClick={onClick}
+      aria-pressed={onClick ? !!active : undefined}
       className={`rounded-full px-2 py-0.5 text-[8px] sm:text-[9px] font-semibold tracking-[0.12em] ring-1 backdrop-blur-md transition-all ${
         tones[tone]
       } ${onClick ? 'pointer-events-auto cursor-pointer hover:brightness-125 active:scale-95' : ''} ${
@@ -33,6 +36,8 @@ function Pill({ children, tone = 'slate', onClick, active }) {
 export default function TopOverlay() {
   const audioOn = useEngineStore((s) => s.audioOn);
   const muted = useEngineStore((s) => s.muted);
+  const volume = useEngineStore((s) => s.volume);
+  const setVolume = useEngineStore((s) => s.setVolume);
   const xray = useEngineStore((s) => s.xray);
   const engineType = useEngineStore((s) => s.engineType);
   const aspiration = useEngineStore((s) => s.aspiration);
@@ -44,7 +49,7 @@ export default function TopOverlay() {
   const asp = ASPIRATIONS[aspiration] || ASPIRATIONS.SINGLE_TURBO;
 
   return (
-    <div className="pointer-events-none absolute left-2.5 top-2.5 sm:left-4 sm:top-3.5 z-10 max-w-[65%] sm:max-w-none">
+    <div className="hud-safe-tl pointer-events-none absolute z-10 max-w-[65%] sm:max-w-none">
       <div className="text-[7px] sm:text-[9px] font-semibold tracking-[0.26em] text-cyan-400/90">
         ENGINE LAB · POWERTRAIN & DYNO SIMULATOR
       </div>
@@ -75,10 +80,44 @@ export default function TopOverlay() {
         </Pill>
         <Pill
           onClick={toggleMuteAudio}
-          tone={audioOn && !muted ? 'emerald' : 'slate'}
+          tone={muted ? 'amber' : audioOn ? 'emerald' : 'slate'}
+          active={!muted && audioOn}
         >
-          {muted ? '✕ MUTE' : audioOn ? '● AUDIO' : '○ AUDIO'}
+          {muted ? '✕ MUTED' : audioOn ? '● AUDIO' : '○ SOUND'}
         </Pill>
+      </div>
+
+      <div className="pointer-events-auto mt-1.5 flex w-fit items-center gap-2 rounded-full border border-white/10 bg-black/50 px-2 py-1 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={toggleMuteAudio}
+          aria-label={muted ? 'Unmute engine sound' : 'Mute engine sound'}
+          aria-pressed={muted}
+          className="rounded-full text-slate-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+        >
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M11 5 6 9H3v6h3l5 4z" />
+            {muted ? <path d="m16 9 5 6m0-6-5 6" /> : <path d="M15 9a5 5 0 0 1 0 6m3-9a9 9 0 0 1 0 12" />}
+          </svg>
+        </button>
+        <span className="text-[7px] font-bold tracking-[0.18em] text-slate-400">SOUND</span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={Math.round(volume * 100)}
+          aria-label="Engine sound volume"
+          className="volume-range w-[72px] sm:w-[88px]"
+          onChange={(event) => {
+            const next = Number(event.target.value) / 100;
+            setVolume(next);
+            audioEngine.setVolume(next);
+          }}
+        />
+        <span className="w-7 text-right font-mono text-[8px] tabular-nums text-slate-300">
+          {Math.round(volume * 100)}%
+        </span>
       </div>
     </div>
   );

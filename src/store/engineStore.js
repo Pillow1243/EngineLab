@@ -1,13 +1,69 @@
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 import {
   GEAR_RATIOS,
   FINAL_DRIVE,
   WHEEL_RADIUS,
   UPGRADES,
+  ENGINES,
+  ASPIRATIONS,
+  ECU_MODES,
+  BUILD_PRESETS,
 } from '../sim/constants.js';
 import { resolveSpecs } from '../sim/simulation.js';
 
 const c01 = (v) => Math.min(1, Math.max(0, v));
+const SETTINGS_KEY = 'engine-lab-settings-v1';
+const PERSISTED_FIELDS = [
+  'engineType',
+  'aspiration',
+  'internalsUpgrade',
+  'exhaustUpgrade',
+  'transUpgrade',
+  'tireUpgrade',
+  'nosInstalled',
+  'view',
+  'xray',
+  'ecuMode',
+  'autoShift',
+  'muted',
+  'volume',
+];
+const VIEW_IDS = ['front', 'side', 'top', 'detail', 'turbo'];
+const SETTING_VALIDATORS = {
+  engineType: (v) => Object.hasOwn(ENGINES, v),
+  aspiration: (v) => Object.hasOwn(ASPIRATIONS, v),
+  internalsUpgrade: (v) => Object.hasOwn(UPGRADES.internals, v),
+  exhaustUpgrade: (v) => Object.hasOwn(UPGRADES.exhaust, v),
+  transUpgrade: (v) => Object.hasOwn(UPGRADES.transmission, v),
+  tireUpgrade: (v) => Object.hasOwn(UPGRADES.tires, v),
+  nosInstalled: (v) => typeof v === 'boolean',
+  view: (v) => VIEW_IDS.includes(v),
+  xray: (v) => typeof v === 'boolean',
+  ecuMode: (v) => Object.hasOwn(ECU_MODES, v),
+  autoShift: (v) => typeof v === 'boolean',
+  muted: (v) => typeof v === 'boolean',
+  volume: (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1,
+};
+
+function loadSavedSettings() {
+  try {
+    if (typeof window === 'undefined') return {};
+    const saved = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+    return Object.fromEntries(
+      PERSISTED_FIELDS.filter((key) => SETTING_VALIDATORS[key](saved[key])).map((key) => [key, saved[key]]),
+    );
+  } catch {
+    // Private browsing and strict storage policies may disable localStorage.
+    return {};
+  }
+}
+
+const pickPersistedSettings = (s) =>
+  Object.fromEntries(PERSISTED_FIELDS.map((key) => [key, s[key]]));
+const samePersistedSettings = (a, b) =>
+  !!a && !!b && PERSISTED_FIELDS.every((key) => a[key] === b[key]);
 
 const vibrate = (pattern) => {
   try {
@@ -19,7 +75,7 @@ const vibrate = (pattern) => {
   }
 };
 
-export const useEngineStore = create((set, get) => ({
+const engineStore = (set, get) => ({
   /* ---------- fast fields (written by the simulation loop each frame) ---------- */
   running: false,
   cranking: false,
@@ -55,6 +111,7 @@ export const useEngineStore = create((set, get) => ({
   autoShift: false, // automatic 7-DCT shifting
   audioOn: false,
   muted: false,
+  volume: 0.72,
 
   /* ---------- Engine Garage & Tuning Workshop state ---------- */
   engineType: 'I5_29', // 'I4_20' | 'I5_29' | 'I6_30' | 'V8_40'
@@ -66,6 +123,7 @@ export const useEngineStore = create((set, get) => ({
   nosInstalled: true,
   nosActive: false,
   tuningOpen: false,
+  ...loadSavedSettings(),
 
   /* ---------- actions ---------- */
   start() {
@@ -166,7 +224,7 @@ export const useEngineStore = create((set, get) => ({
     set({ brake: c01(v) });
   },
   setNosActive(v) {
-    set({ nosActive: !!v });
+    set({ nosActive: !!v && get().nosInstalled });
   },
   setView(v) {
     set({ view: v });
@@ -192,6 +250,19 @@ export const useEngineStore = create((set, get) => ({
   },
   toggleMute() {
     set((s) => ({ muted: !s.muted }));
+  },
+  setVolume(v) {
+    set({ volume: c01(Number(v)) });
+  },
+  applyBuildPreset(id) {
+    const preset = BUILD_PRESETS.find((item) => item.id === id);
+    if (!preset) return;
+    vibrate([15, 25, 15]);
+    set({ ...preset.config, nosActive: false, zeroToHundred: null, boost: 0, spool: 0 });
+  },
+  setNosInstalled(v) {
+    const nosInstalled = !!v;
+    set((s) => ({ nosInstalled, nosActive: nosInstalled && s.nosActive }));
   },
   setEngineType(engineType) {
     vibrate([15, 30]);
@@ -219,9 +290,52 @@ export const useEngineStore = create((set, get) => ({
   },
   toggleTuningOpen() {
     vibrate(10);
-    set((s) => ({ tuningOpen: !s.tuningOpen }));
+    set((s) => {
+      const tuningOpen = !s.tuningOpen;
+      return tuningOpen
+        ? { tuningOpen, throttle: 0, brake: 0, nosActive: false }
+        : { tuningOpen };
+    });
   },
   setTuningOpen(v) {
-    set({ tuningOpen: !!v });
+    const tuningOpen = !!v;
+    set((s) =>
+      tuningOpen
+        ? { tuningOpen, throttle: 0, brake: 0, nosActive: false }
+        : { tuningOpen },
+    );
   },
-}));
+});
+
+export const useEngineStore = create(subscribeWithSelector(engineStore));
+
+// Persist only low-frequency setup changes, never the 60 fps simulation state.
+let saveTimer = 0;
+let pendingSettings = null;
+function flushSettings() {
+  if (typeof window === 'undefined') return;
+  if (saveTimer) window.clearTimeout(saveTimer);
+  if (!pendingSettings) return;
+  try {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(pendingSettings));
+  } catch {
+    // The simulator remains fully usable when storage is unavailable or full.
+  }
+  pendingSettings = null;
+  saveTimer = 0;
+}
+
+useEngineStore.subscribe(
+  pickPersistedSettings,
+  (settings) => {
+    if (typeof window === 'undefined') return;
+    pendingSettings = settings;
+    if (saveTimer) window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(flushSettings, 180);
+  },
+  { equalityFn: samePersistedSettings },
+);
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushSettings);
+}

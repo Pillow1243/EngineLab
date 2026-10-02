@@ -17,7 +17,10 @@ function Pedal({ id, label, ko, from, to }) {
   const fillRef = useLiveStylePart(valueSel, (v) => ({ height: `${(v * 100).toFixed(1)}%` }));
   const pctRef = useLiveNode((el, s) => {
     const v = valueSel(s);
-    el.textContent = String(Math.round(v * 100));
+    const percent = Math.round(v * 100);
+    el.textContent = String(percent);
+    el.setAttribute('aria-valuenow', String(percent));
+    el.setAttribute('aria-valuetext', `${percent}%`);
     el.style.color = v > 0.02 ? from : '#64748b';
   });
 
@@ -26,6 +29,19 @@ function Pedal({ id, label, ko, from, to }) {
     const r = e.currentTarget.getBoundingClientRect();
     const raw = 1 - (e.clientY - r.top) / Math.max(1, r.height);
     setter(c01(raw * 1.12));
+  };
+
+  const handlePedalKeyDown = (e) => {
+    const current = valueSel(useEngineStore.getState());
+    const step = e.shiftKey ? 0.2 : 0.05;
+    let next;
+    if (e.code === 'ArrowUp' || e.code === 'ArrowRight') next = current + step;
+    else if (e.code === 'ArrowDown' || e.code === 'ArrowLeft') next = current - step;
+    else if (e.code === 'Home') next = 0;
+    else if (e.code === 'End') next = 1;
+    else return;
+    e.preventDefault();
+    setter(c01(next));
   };
 
   return (
@@ -54,7 +70,14 @@ function Pedal({ id, label, ko, from, to }) {
         }}
         onContextMenu={(e) => e.preventDefault()}
         role="slider"
+        tabIndex={0}
         aria-label={`${label} pedal`}
+        aria-orientation="vertical"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={0}
+        aria-valuetext="0%"
+        onKeyDown={handlePedalKeyDown}
       >
         {[20, 40, 60, 80].map((t) => (
           <div
@@ -93,8 +116,8 @@ function Pedal({ id, label, ko, from, to }) {
 /** Interactive multi-touch Brake, Throttle & N₂O Nitrous Purge/Shot controls. */
 export default function Pedals() {
   const nosActive = useEngineStore((s) => s.nosActive);
+  const nosInstalled = useEngineStore((s) => s.nosInstalled);
   const setNosActive = useEngineStore((s) => s.setNosActive);
-  const setThrottle = useEngineStore((s) => s.setThrottle);
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-between px-2 py-1.5 sm:px-3 sm:py-2">
@@ -104,22 +127,44 @@ export default function Pedals() {
         </span>
         {/* N₂O Nitrous Oxide Hold Button */}
         <button
+          type="button"
+          title={nosInstalled ? 'Hold throttle and N₂O together. This button never changes throttle.' : 'Install the N₂O kit in the garage to use this control.'}
+          aria-label={nosInstalled ? 'Hold to activate nitrous oxide while applying throttle' : 'Nitrous oxide kit is not installed'}
+          aria-pressed={nosInstalled && nosActive}
+          disabled={!nosInstalled}
           onPointerDown={(e) => {
             e.preventDefault();
             audioEngine.ensure();
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+              /* ignore unsupported pointer capture */
+            }
             setNosActive(true);
-            if (useEngineStore.getState().throttle < 0.5) setThrottle(1);
           }}
           onPointerUp={() => setNosActive(false)}
-          onPointerLeave={() => setNosActive(false)}
           onPointerCancel={() => setNosActive(false)}
+          onLostPointerCapture={() => setNosActive(false)}
+          onKeyDown={(e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+              e.preventDefault();
+              audioEngine.ensure();
+              setNosActive(true);
+            }
+          }}
+          onKeyUp={(e) => {
+            if (e.code === 'Space' || e.code === 'Enter') setNosActive(false);
+          }}
+          onBlur={() => setNosActive(false)}
           className={`rounded-md border px-2 py-0.5 font-mono text-[8px] sm:text-[9px] font-extrabold tracking-wider transition-all ${
-            nosActive
+            nosInstalled && nosActive
               ? 'border-cyan-300 bg-cyan-400/30 text-white shadow-[0_0_16px_rgba(56,189,248,0.85)] scale-95'
-              : 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20'
+              : nosInstalled
+                ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20'
+                : 'cursor-not-allowed border-white/10 bg-white/[0.02] text-slate-600'
           }`}
         >
-          ⚡ N₂O SHOT
+          {nosInstalled ? '⚡ N₂O SHOT' : 'N₂O OFF'}
         </button>
       </div>
 

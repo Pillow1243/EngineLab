@@ -22,7 +22,19 @@ export function useKeyboard() {
     const st = () => useEngineStore.getState();
 
     const down = (e) => {
-      if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      const target = e.target;
+      if (
+        target &&
+        (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)
+      ) {
+        return;
+      }
+      const onControl = !!target?.closest?.('button, [role="slider"]');
+      if (onControl && !['Escape', 'KeyG', 'KeyM'].includes(e.code)) return;
+
+      // Let the garage use arrow keys for scrolling and never drive behind the modal.
+      if (st().tuningOpen && !['Escape', 'KeyG', 'KeyM'].includes(e.code)) return;
+
       switch (e.code) {
         case 'ArrowUp':
         case 'KeyW':
@@ -63,7 +75,7 @@ export function useKeyboard() {
           break;
         case 'ShiftLeft':
         case 'ShiftRight':
-          if (!e.repeat) {
+          if (!e.repeat && st().nosInstalled) {
             audioEngine.ensure();
             st().setNosActive(true);
           }

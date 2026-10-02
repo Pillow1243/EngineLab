@@ -98,7 +98,7 @@ export function engineTorque(rpm, throttle, boost, s) {
   if (rpm < idle + 150 && throttle < 0.08) {
     eff = Math.max(eff, clamp((idle + 70 - rpm) / idle, 0, 1) * 0.62);
   }
-  const nosBonus = s?.nosActive && throttle > 0.5 && rpm > 2200 ? 155 : 0;
+  const nosBonus = s?.nosInstalled !== false && s?.nosActive && throttle > 0.5 && rpm > 2200 ? 155 : 0;
   return baseTorque(rpm, s) * (0.2 + 0.8 * eff) * (1 + 1.02 * boost) + nosBonus;
 }
 
@@ -112,7 +112,7 @@ export function enginePowerHP(rpm, throttle, boost, s) {
 export function getMode(s) {
   if (s.cranking) return { label: 'CRANKING', color: '#fbbf24' };
   if (s.launchActive) return { label: 'LAUNCH CTRL', color: '#f97316' };
-  if (s.nosActive && s.running && s.throttle > 0.4) return { label: 'N₂O SHOT!', color: '#38bdf8' };
+  if (s.nosInstalled !== false && s.nosActive && s.running && s.throttle > 0.4) return { label: 'N₂O SHOT!', color: '#38bdf8' };
   if (s.shiftLock > 0.05) return { label: 'SHIFTING', color: '#f59e0b' };
   if (!s.running) return { label: s.rpm > 50 ? 'COAST' : 'STOPPED', color: '#64748b' };
   if (s.backfireFlash > 0.05) return { label: 'OVERRUN POP', color: '#fb923c' };
@@ -471,7 +471,7 @@ export function stepSim(s, dt) {
     310 +
     420 * clamp(rpm / limitRpm, 0, 1) * (0.35 + 0.65 * mappedThrottle) +
     190 * clamp(boost / 1.5, 0, 1.3) +
-    (s.nosActive && throttle > 0.5 ? 110 : 0) +
+    (s.nosInstalled !== false && s.nosActive && throttle > 0.5 ? 110 : 0) +
     (backfireFlash > 0 ? 85 : 0);
   egt += (egtTarget - egt) * Math.min(1, dt * (egtTarget > egt ? 0.55 : 0.22));
   egt = clamp(egt, 240, 1020);
